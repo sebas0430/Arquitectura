@@ -1,7 +1,5 @@
 # Documento de Arquitectura de Software (SAD) V1 — TécnicoCerca
 
-
-
 ---
 
 ## 1. Drivers y Killers
@@ -32,12 +30,6 @@ Esta sección identifica las fuerzas que determinan las decisiones de arquitectu
 |K7|Equipo de estudiantes sin operación 24/7|Naturaleza del proyecto; sin turnos, guardias ni rol de operación dedicado|Mecanismos de alta disponibilidad con recuperación automática compleja (failover, multi-zona)|
 |K8|No se construye sitio público con SEO / presencia digital|Solicitud explícita del cliente, fuera de alcance por restricción de tiempo (K3)|Páginas públicas indexables, contenido SSR orientado a SEO, integración con redes sociales/Google Business — el frontend web se limita al panel administrativo|
 
-> **Nota:** D2 y D7 fueron resueltos. D2: doble ranking confirmado (ver implicación arquitectónica). D7 fue reclasificado como K8 (ver Killers): el frontend web es exclusivamente el panel administrativo del tenant, sin sitio público indexable.
-
-> **Nota — tensión reconocida:** la decisión de adoptar arquitectura de microservicios + event-driven (ver sección 4 y ADR-003) incrementa la complejidad operativa frente a K3 (timeline académico corto) y K7 (equipo sin operación 24/7). Es una decisión consciente del equipo, no una que ignore estas restricciones; el riesgo se documenta explícitamente en los ADRs correspondientes.
-
----
-
 ## 2. Atributos de Calidad
 
 Los atributos de calidad expresan, en términos medibles, las propiedades que el sistema debe cumplir. Cada atributo seleccionado está sustentado por uno o más de los drivers o killers definidos en la sección anterior.
@@ -55,7 +47,7 @@ Los atributos de calidad expresan, en términos medibles, las propiedades que el
 
 ## 3. Escenarios de Calidad
 
-Cada escenario sigue la estructura de seis partes: fuente del estímulo, estímulo, ambiente, artefacto, respuesta y medida de la respuesta. Los escenarios se redactan de forma agnóstica a la tecnología concreta; la tecnología específica se define en la sección de Arquitectura de Alto Nivel.
+Cada escenario sigue la estructura de seis partes: fuente del estímulo, estímulo, ambiente, artefacto, respuesta y medida de la respuesta.
 
 Cada escenario se clasifica en uno de tres tipos:
 
@@ -74,7 +66,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Horario de alta demanda|
 |Artefacto|Mecanismo de búsqueda por ubicación y disponibilidad|
 |Respuesta|Devuelve lista ordenada por distancia y ranking|
-|Medida|Menos de 2 segundos para el 95% de las solicitudes|
+|Medida|Menos de 3 segundos para el 95% de las solicitudes|
 
 **Escenario 2 — Consulta de historial** · _Tipo: Uso_
 
@@ -85,7 +77,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Operación normal, historial con múltiples solicitudes acumuladas|
 |Artefacto|Módulo de gestión de solicitudes|
 |Respuesta|Devuelve el historial paginado|
-|Medida|Menos de 1 segundo para cargar una página de resultados|
+|Medida|Menos de 1.5 segundos para cargar una página de resultados|
 
 **Escenario 3 — Procesamiento en segundo plano** · _Tipo: Uso_
 
@@ -96,7 +88,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Operación normal|
 |Artefacto|Mecanismo de procesamiento asíncrono|
 |Respuesta|Identifica y notifica a los técnicos candidatos|
-|Medida|Menos de 5 segundos desde la creación de la solicitud hasta la notificación|
+|Medida|Menos de 7 segundos desde la creación de la solicitud hasta la notificación|
 
 **Escenario 4 — Pico de carga inesperado** · _Tipo: Fallo_
 
@@ -107,7 +99,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Evento de demanda no anticipado|
 |Artefacto|Matching Service|
 |Respuesta|El sistema degrada de forma controlada (cola de espera) en vez de caerse por completo|
-|Medida|0% de caídas totales del servicio bajo 3 veces la carga esperada, aunque el tiempo de respuesta pueda superar los 2 segundos definidos en el Escenario 1|
+|Medida|El sistema soporta hasta **150 solicitudes de matching concurrentes** (estimado como 3 veces una carga esperada de ~50 solicitudes concurrentes en hora pico) sin devolver errores ni caerse por completo; el tiempo de respuesta puede degradarse más allá de los 3 segundos definidos en el Escenario 1, pero el servicio sigue respondiendo|
 
 ### 3.2 AC2 — Seguridad
 
@@ -166,7 +158,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Operación normal|
 |Artefacto|Sistema en general|
 |Respuesta|Las funciones core (autenticación, solicitud de servicio) siguen operando desde los componentes restantes|
-|Medida|Recuperación manual en un plazo de **12 a 24 horas** `[PROPUESTA — validar en reunión]`, dado que no hay operación 24/7|
+|Medida|Recuperación manual en un plazo de **12 a 24 horas**, dado que no hay operación 24/7|
 
 **Escenario 2 — Mantenimiento planeado** · _Tipo: Uso_
 
@@ -177,7 +169,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Ventana anunciada al equipo|
 |Artefacto|Sistema en general|
 |Respuesta|El mantenimiento se realiza sin pérdida de datos, con downtime acotado y comunicado|
-|Medida|Downtime planeado menor a **2 horas** `[PROPUESTA — validar en reunión]`|
+|Medida|Downtime planeado menor a **2 horas**|
 
 **Escenario 3 — Caída de un microservicio individual** · _Tipo: Fallo_
 
@@ -212,7 +204,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Operación normal, sin interrumpir a los tenants existentes|
 |Artefacto|Módulo de gestión de tenants y esquema de base de datos|
 |Respuesta|El nuevo tenant queda operativo con sus datos aislados, sin requerir cambios estructurales en el esquema|
-|Medida|Tenant funcional en menos de **1 hora** `[PROPUESTA — validar en reunión]`, sin downtime para tenants existentes|
+|Medida|Tenant funcional en menos de **1 hora**, sin downtime para tenants existentes|
 
 **Escenario 2 — Crecimiento del catálogo de técnicos** · _Tipo: Cambio_
 
@@ -247,7 +239,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Ambiente|Desarrollo activo|
 |Artefacto|Pipeline de integración continua (build y pruebas automáticas)|
 |Respuesta|El pipeline corre y reporta si el cambio rompió algo|
-|Medida|Completa build y pruebas en menos de **10 minutos** `[PROPUESTA — validar en reunión]`|
+|Medida|Completa build y pruebas en menos de **10 minutos**|
 
 **Escenario 2 — Acoplamiento entre módulos** · _Tipo: Cambio_
 
@@ -306,8 +298,6 @@ Cada escenario se clasifica en uno de tres tipos:
 |Respuesta|El efecto del evento se aplica una sola vez, pese a llegar duplicado|
 |Medida|0 efectos duplicados (ej. doble notificación, doble cálculo de ranking), verificable por `eventId`|
 
-> **Nota general:** las medidas marcadas como propuesta corresponden a valores sugeridos por el área de infraestructura, pendientes de validación con el equipo completo.
-
 ### 3.7 Priorización de escenarios
 
 Siguiendo el método ATAM, cada escenario se prioriza en dos ejes votados por separado, cada uno desde una perspectiva distinta:
@@ -340,8 +330,6 @@ Solo los escenarios que califican Alta en ambos ejes se consideran **prioritario
 |AC6-E1 Reconstrucción de una disputa|Trazabilidad|Alta|Media|**Alta**|
 |AC6-E2 Registro de cambios en pagos|Trazabilidad|Alta|Baja|Media|
 |AC6-E3 Evento duplicado por reintento|Trazabilidad|Alta|Alta|**Alta**|
-
-**Escenarios prioritarios (Alta/Alta): 10 de 20** — estos son los que sustentan directamente los ADRs de la sección 6: AC1-E1, AC1-E3, AC2-E1, AC2-E2, AC2-E4, AC3-E1, AC3-E3, AC3-E4, AC6-E1, AC6-E3.
 
 ---
 
@@ -441,8 +429,6 @@ Ejemplos de flujo de eventos:
 
 Los servicios no se llaman entre sí de forma síncrona salvo cuando el usuario necesita una respuesta inmediata (a través del API Gateway). Toda coordinación entre dominios de negocio ocurre mediante eventos publicados y consumidos vía Kafka. Esto reduce el acoplamiento entre servicios, pero introduce complejidad adicional: consistencia eventual (los datos entre servicios no se actualizan de forma instantánea) y necesidad de manejar fallos de entrega de eventos (ver ADR-007, Transactional Outbox + idempotencia, ahora crítico para _todo_ el sistema y no solo para tareas en segundo plano).
 
-> **Nota — riesgo asumido:** pasar de monolito modular a microservicios + event-driven aumenta significativamente la complejidad operativa (más servicios que desplegar, monitorear y depurar; consistencia eventual en vez de transacciones ACID entre dominios) frente a K3 (timeline corto) y K7 (equipo sin operación 24/7). Ver ADR-003 (sección 6) para el trade-off explícito.
-
 ---
 
 ## 5. Arquitectura de Infraestructura
@@ -455,17 +441,13 @@ Esta sección describe cómo se distribuye el sistema sobre las 7 VMs propias (K
 |---|---|---|---|
 |VM1|10.43.100.168|Gateway / Entry point|Nginx + API Gateway — enruta tráfico a Next.js y a los 8 microservicios en VM3|
 |VM2|10.43.98.15|Frontend Web|Next.js (panel administrativo del tenant — sin sitio público, ver K8)|
-|VM3|10.43.98.205|Backend — microservicios|8 microservicios (Identity, Actors, Catalog, Matching, ServiceRequest, Ranking, Payments, Communication) como contenedores independientes vía Docker Compose|
+|VM3|10.43.98.205|Backend — microservicios|8 microservicios (Identity, Actors, Catalog, Matching, ServiceRequest, Ranking, Payments, Communication) como Deployments de Kubernetes (k3s)|
 |VM4|10.43.98.209|Base de datos|PostgreSQL + PostGIS (fuente de verdad, incluye datos geoespaciales)|
 |VM5|10.43.98.29|Cache / colas cortas|Redis (BullMQ para trabajos programados)|
 |VM6|10.43.99.12|Mensajería asíncrona|Apache Kafka + Kafka UI (matching, ranking, notificaciones, pagos)|
 |VM7|10.43.99.8|Storage + Observabilidad|MinIO (evidencias fotográficas) + logs estructurados / métricas|
 
-**Nota sobre Flutter (móvil):** no necesita VM propia — se compila en CI (GitHub Actions) y consume la API desde VM1/VM3.
-
-> **Discrepancia detectada:** el documento previo de infraestructura describe VM2 como servidor tanto del "sitio público" como del panel administrativo. Con K8 ya confirmado (sin sitio público / SEO fuera de alcance), ese documento debe actualizarse para que VM2 quede descrita únicamente como panel administrativo, consistente con esta sección del SAD.
-
-> **Nota — decisión de infraestructura ante microservicios:** dado K5 (sin presupuesto para VMs adicionales) y K7 (sin operación 24/7 que justifique un clúster), los 8 microservicios **no** reciben una VM cada uno. Los 8 corren como contenedores independientes dentro de VM3, orquestados con Docker Compose (no Kubernetes). Esto preserva el beneficio de despliegue y escalado independiente por servicio a nivel de contenedor, sin el costo ni la complejidad operativa de VMs o clúster dedicados por servicio — ver ADR-011 (sección 5.7) y ADR-003 (sección 6).
+Dado K5 (sin presupuesto para VMs adicionales), los 8 microservicios no reciben una VM cada uno. Los 8 corren dentro de VM3, orquestados con Kubernetes (k3s, clúster de un solo nodo), lo que permite escalado independiente por servicio, auto-healing y rolling updates sin downtime — ver ADR-011 (sección 5.7) y ADR-003 (sección 6).
 
 ### 5.2 Principio de distribución
 
@@ -473,13 +455,15 @@ Esta sección describe cómo se distribuye el sistema sobre las 7 VMs propias (K
 - **Base de datos sola en su VM** (VM4): es el recurso más sensible — nunca comparte máquina con procesos que puedan consumir su CPU/RAM.
 - **Redis separado de Kafka** (VM5 vs. VM6): aunque ambos son infraestructura de soporte, tienen patrones de carga distintos (Redis = baja latencia constante, Kafka = throughput por ráfagas).
 
+> **Limitación reconocida — punto único de falla en VM3:** k3s aísla los 8 microservicios entre sí a nivel de pod, con auto-healing (si un pod falla, Kubernetes lo reinicia automáticamente sin afectar a los demás, ver escenario AC3-E3), pero **siguen compartiendo la misma máquina física** al ser un clúster de un solo nodo. Si VM3 completa falla (hardware, memoria agotada, etc.), los 8 servicios caen simultáneamente porque no hay un segundo nodo al cual Kubernetes pueda reprogramar los pods. Esto limita el beneficio de "resiliencia ante fallos aislados" atribuido a los microservicios en el ADR-003 al nivel de proceso/pod, no al nivel de máquina — un clúster multi-nodo eliminaría esta limitación, pero requeriría VMs adicionales que violan K5 (sin presupuesto para VMs adicionales).
+
 ### 5.3 Orden de arranque
 
-Existen dependencias de arranque entre componentes: PostgreSQL y Kafka deben estar disponibles antes que los microservicios. Este orden se garantiza con healthchecks en Docker Compose y/o con un script de orquestación:
+Existen dependencias de arranque entre componentes: PostgreSQL y Kafka deben estar disponibles antes que los microservicios. Este orden se garantiza con healthchecks en Docker Compose, probes de Kubernetes (`readinessProbe`/`livenessProbe`) en k3s, y/o con un script de orquestación:
 
 1. VM4 (PostgreSQL/PostGIS) y VM5 (Redis)
 2. VM6 (Kafka) — los microservicios dependen del bus de eventos para operar correctamente
-3. VM3 (los 8 microservicios, vía Docker Compose)
+3. VM3 (los 8 microservicios, vía Kubernetes/k3s)
 4. VM2 (Next.js) y VM1 (Nginx Gateway / API Gateway)
 5. VM7 (MinIO + Observabilidad) — independiente, puede iniciar en paralelo
 
@@ -493,7 +477,7 @@ ansible/
 ├── setup-base.yml         → Docker y dependencias comunes (corre en las 7)
 ├── deploy-db.yml          → especifico para VM4 (PostgreSQL + PostGIS)
 ├── deploy-kafka.yml       → especifico para VM6
-├── deploy-microservices.yml → despliega los 8 servicios en VM3
+├── deploy-k3s.yml         → instala k3s (Kubernetes) en VM3
 └── group_vars/
 ```
 
@@ -530,21 +514,28 @@ ansible-playbook -i inventory.ini setup-base.yml
 
 ### 5.5 Contenedores y despliegue
 
-VM3 corre un `docker-compose.yml` con un servicio de contenedor por cada microservicio (8 en total), permitiendo desplegar, reiniciar o escalar cada uno de forma independiente sin afectar a los demás:
+VM3 corre **k3s**, una distribución ligera de Kubernetes con la misma API que un clúster completo, operando como **clúster de un solo nodo** (sin necesidad de VMs adicionales, consistente con K5). Cada uno de los 8 microservicios se despliega como un `Deployment` + `Service` de Kubernetes independiente, lo que permite reiniciar, actualizar, o escalar el número de réplicas de un servicio específico sin afectar a los demás:
 
 ```
 infrastructure/
 ├── vm1-gateway/docker-compose.yml
 ├── vm2-web/docker-compose.yml
-├── vm3-microservices/
-│   └── docker-compose.yml   → 8 servicios: identity, actors, catalog,
-│                               matching, service-request, ranking,
-│                               payments, communication
+├── vm3-k3s/
+│   ├── identity/deployment.yaml + service.yaml
+│   ├── actors/deployment.yaml + service.yaml
+│   ├── catalog/deployment.yaml + service.yaml
+│   ├── matching/deployment.yaml + service.yaml
+│   ├── service-request/deployment.yaml + service.yaml
+│   ├── ranking/deployment.yaml + service.yaml
+│   ├── payments/deployment.yaml + service.yaml
+│   └── communication/deployment.yaml + service.yaml
 ├── vm4-database/docker-compose.yml
 ├── vm5-redis/docker-compose.yml
 ├── vm6-kafka/docker-compose.yml
 └── vm7-storage-observability/docker-compose.yml
 ```
+
+Solo VM3 usa Kubernetes; el resto de VMs sigue con Docker Compose, ya que no alojan múltiples servicios independientes que se beneficien de esa orquestación.
 
 ### 5.6 CI/CD
 
@@ -552,15 +543,15 @@ Pipeline en GitHub Actions, separado por aplicación (`web/`, `mobile/`) y **por
 
 - **Al abrir PR**: lint + tests unitarios — solo se ejecuta el pipeline del microservicio afectado, no de los 8.
 - **Al mergear a `develop`**: build + tests de integración del servicio modificado.
-- **Al mergear a `main` / crear `release/*`**: build de imagen Docker y despliegue automático vía SSH a VM3, reiniciando únicamente el contenedor del servicio afectado (`docker compose up -d <servicio>`), sin downtime para los demás servicios.
+- **Al mergear a `main` / crear `release/*`**: build de imagen Docker, push al registro, y despliegue automático a k3s (`kubectl set image deployment/<servicio> ...` o `kubectl apply -f`), reiniciando únicamente el Deployment del servicio afectado, sin downtime para los demás gracias al rolling update nativo de Kubernetes.
 
 ### 5.7 ADR de infraestructura
 
 |ID|Decisión|Atributo priorizado|Atributo sacrificado|Justificación|
 |---|---|---|---|---|
-|ADR-011|Docker Compose por VM (sin Kubernetes ni cloud administrado)|Costo/simplicidad operativa (K5, K7 — no cubierto por un AC propio)|AC3 Disponibilidad (auto-healing, auto-scaling que sí ofrecería Kubernetes)|Manejable por una sola persona sin costo de infraestructura adicional; aceptable dado K7 (sin operación 24/7)|
+|ADR-011|Kubernetes (k3s, clúster de un solo nodo en VM3) para orquestar los 8 microservicios; Docker Compose para el resto de VMs|AC3 Disponibilidad (rolling updates sin downtime, auto-healing de contenedores)|Costo/simplicidad operativa (curva de aprendizaje y administración de un clúster, aunque sea de un solo nodo)|Kubernetes real (vía k3s) sin salirse del presupuesto de 7 VMs (K5); el equipo asume conscientemente la mayor complejidad operativa pese a K7 (sin operación 24/7), confiando en la capacidad propia para administrarlo|
 
-> **Nota:** se descartó Kubernetes explícitamente por ser sobre-ingeniería para 7 VMs administradas por una sola persona en un proyecto académico — Docker Swarm quedó como alternativa intermedia no elegida, ya que Compose por VM resulta suficientemente simple sin agregar la complejidad de gestión de un clúster. La decisión de microservicios (ADR-003, sección 6) se mantiene compatible con esta restricción: los 8 servicios corren en la misma VM3 vía Compose, sin requerir infraestructura de orquestación adicional.
+> **Nota:** se descartó un clúster de Kubernetes multi-nodo (vía `kubeadm` completo) por requerir VMs adicionales dedicadas al control plane, lo cual viola K5. k3s resuelve esto al ser una distribución de Kubernetes completa pero liviana, capaz de correr en un solo nodo (VM3) sin sacrificar la API estándar de Kubernetes ni los manifiestos de Deployment/Service. El resto de las VMs (base de datos, cache, mensajería, storage) se mantiene en Docker Compose simple, ya que no alojan múltiples servicios independientes que se beneficien de orquestación.
 
 ---
 
@@ -570,20 +561,15 @@ Cada ADR (Architecture Decision Record) documenta una decisión de arquitectura 
 
 |ID|Decisión|Atributo priorizado|Atributo sacrificado|Justificación|
 |---|---|---|---|---|
-|ADR-001|Next.js exclusivamente para panel administrativo|—|—|Decisión de alcance de negocio (K3, K8) — no hay trade-off entre atributos de calidad|
-|ADR-002|Flutter como cliente único móvil|AC5 Mantenibilidad|Rendimiento nativo (no cubierto por un AC propio)|K3: una sola base de código a cambio de perder rendimiento/APIs nativas óptimas por plataforma|
+|ADR-002|Flutter como cliente único móvil|AC5 Mantenibilidad|AC1 Rendimiento (nativo por plataforma)|K3: una sola base de código a cambio de perder rendimiento/APIs nativas óptimas por plataforma|
 |ADR-003|Microservicios + Event-Driven Architecture|AC4 Escalabilidad, AC3 Disponibilidad|AC5 Mantenibilidad|Fallos aislados y escalado independiente por servicio (AC3-E3, AC3-E4, AC4-E3), a costa de mayor complejidad de desarrollo y riesgo frente a K3, K7|
-|ADR-004|PostgreSQL + PostGIS|AC1 Rendimiento|Flexibilidad de esquema (no cubierto por un AC propio)|D1: consultas geoespaciales nativas para el matching (AC1-E1)|
-|ADR-005|Shared-schema con `tenant_id` + RLS|Costo/velocidad de implementación (no cubierto por un AC propio)|AC2 Seguridad (aislamiento físico total)|D5, K5: aislamiento lógico vía RLS en vez de esquema físico separado por tenant (AC2-E2)|
+|ADR-004|PostgreSQL + PostGIS|AC1 Rendimiento|AC5 Mantenibilidad (flexibilidad de esquema de un motor NoSQL)|D1: consultas geoespaciales nativas para el matching (AC1-E1)|
+|ADR-005|Shared-schema con `tenant_id` + RLS|AC5 Mantenibilidad (costo/velocidad de implementación)|AC2 Seguridad (aislamiento físico total)|D5, K5: aislamiento lógico vía RLS en vez de esquema físico separado por tenant (AC2-E2)|
 |ADR-006|Kafka como bus de eventos central|AC3 Disponibilidad, AC4 Escalabilidad|AC5 Mantenibilidad, AC1 Rendimiento|D1, D8: bajo acoplamiento entre servicios a costa de consistencia eventual (AC1-E3, AC3-E4)|
 |ADR-007|Transactional Outbox + idempotencia|AC3 Disponibilidad, AC6 Trazabilidad|AC5 Mantenibilidad|D8, K5: confiabilidad ante fallos de Kafka y eventos duplicados (AC3-E4, AC6-E3), a costa de más lógica en cada escritura|
-|ADR-008|Modelo de facturación "merchant of record"|—|—|D3: decisión de modelo de negocio, no de atributos de calidad técnicos|
-|ADR-009|Tokenización de pagos|AC2 Seguridad|Control del flujo de pago (no cubierto por un AC propio)|D4, K2: reduce el alcance de cumplimiento PCI-DSS (AC2-E1), a costa de depender de la pasarela externa|
-|ADR-010|Payroll-lite acotado (no ERP)|—|—|K1: decisión de alcance de negocio, no de atributos de calidad técnicos|
+|ADR-009|Tokenización de pagos|AC2 Seguridad|AC5 Mantenibilidad (dependencia de la pasarela externa)|D4, K2: reduce el alcance de cumplimiento PCI-DSS (AC2-E1), a costa de menor control directo sobre el flujo de pago|
 
-**Síntesis:** ni AC1 (Rendimiento) ni AC5 (Mantenibilidad) aparecen priorizados en ningún ADR — siempre son los que se sacrifican (ADR-002, ADR-003, ADR-004, ADR-006, ADR-007). Es consistente con la decisión consciente de anteponer Escalabilidad y Disponibilidad a costa de la complejidad de desarrollo (ver nota de tensión, sección 1.2).
-
-> **Nota:** el ADR-011, propio de infraestructura, se documenta en la sección 5.7. AC2-E4 (token comprometido) y AC6-E1 (reconstrucción de disputa) son escenarios prioritarios sin un ADR dedicado todavía — quedan como candidatos a un futuro ADR de autenticación/auditoría si el equipo lo considera necesario.
+**Síntesis:** ni AC1 (Rendimiento) ni AC5 (Mantenibilidad) aparecen priorizados en ningún ADR — siempre son los que se sacrifican. Es consistente con la decisión consciente de anteponer Escalabilidad y Disponibilidad a costa de la complejidad de desarrollo (ver nota de tensión, sección 1.2).
 
 ---
 
@@ -682,5 +668,3 @@ Esta sección describe las entidades principales del sistema agrupadas por domin
 ### 8.2 Aislamiento multi-tenant a nivel de datos
 
 Consistente con D5 y ADR-005 (shared-schema con `tenant_id` + Row-Level Security), toda tabla de negocio debe incluir la columna `tenant_id`, no solo las tablas raíz (`Tenant`, `User`). Esto sustenta directamente el escenario de calidad de aislamiento multi-tenant definido en AC2 — sin `tenant_id` en cada tabla, la política RLS no puede aplicarse de forma simple y consistente en todo el esquema.
-
-> **Nota:** el diagrama entidad-relación completo, con atributos, tipos de dato, claves foráneas y la revisión/corrección del modelo inicial propuesto por el equipo, se desarrolla en el Documento de Datos (DD) V1.
