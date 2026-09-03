@@ -214,6 +214,8 @@ A continuación se listan las **22 Features** identificadas en el backlog, agrup
 |F6.3 — Monitoreo y Logging|Registro centralizado de errores y alertas básicas de caída de servicio.|RF-28|SCRUM-48|
 |F6.4 — Seguridad de Datos|Cifrado de datos sensibles en tránsito y en reposo.|RF-29|SCRUM-49|
 
+#### Épica 7 — Control de cambios - EQUIPO
+
 ### 5.2 Requisitos Funcionales
 
 #### Épica 1 — Fundación del Sistema y Arquitectura Multi-tenant (SCRUM-7)
