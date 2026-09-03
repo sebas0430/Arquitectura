@@ -1,5 +1,5 @@
-# DD — Documento de Diseño
 
+# DD — Documento de Diseño
 ## Modelos de Datos y Contratos — QUICKPATCH
 
 Plataforma Digital Multi-tenant de Servicios Técnicos para el Hogar y las Empresas
