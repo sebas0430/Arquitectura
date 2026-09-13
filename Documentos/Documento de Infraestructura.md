@@ -52,7 +52,7 @@ Las 7 VMs son asignadas por el laboratorio de virtualización de la Pontificia U
 | RAM | 11 GiB |
 | Disco | 68 GB (50 GB disponibles al aprovisionar) |
 
-> Las 7 VMs tienen la misma asignación de recursos independientemente de su rol. En particular, VM3 aloja los 8 microservicios sobre k3s con la misma RAM disponible que VM5, que solo corre Redis. No representa un incumplimiento de ningún requisito, pero es un límite de capacidad a vigilar a medida que crezca el número de microservicios o el volumen de datos — ver AC1-E4 y AC4-E3 en el SAD.
+> Las 7 VMs tienen la misma asignación de recursos independientemente de su rol. En particular, VM3 aloja los 8 microservicios sobre k3s con la misma RAM disponible que VM5, que solo corre Redis. El presupuesto de CPU/RAM asignado a cada microservicio (sección 4.2) es una estimación de diseño, no una medición real — todavía no existen manifiestos ni datos de carga contra el hardware real. Se vigila con las métricas de Prometheus/`node_exporter` (sección 8) contra los umbrales de AC1-E4 y AC4-E3 del SAD, y se valida de forma definitiva con el benchmarking del entregable "PoC + ADR" (sección 10).
 
 ### 2.2 Detalle por VM
 
@@ -64,7 +64,7 @@ Las 7 VMs son asignadas por el laboratorio de virtualización de la Pontificia U
 | VM4 | Base de datos | `10.43.98.209` | PostgreSQL + PostGIS |
 | VM5 | Cache | `10.43.98.29` | Redis |
 | VM6 | Mensajería | `10.43.99.12` | Apache Kafka + Kafka UI |
-| VM7 | Storage y observabilidad | `10.43.99.8` | MinIO + Prometheus + Grafana + Pino |
+| VM7 | Storage y observabilidad | `10.43.99.8` | MinIO + Prometheus + Loki + Grafana |
 
 ---
 
@@ -101,19 +101,33 @@ vm7 ansible_host=10.43.99.8
 
 | Playbook | Alcance | Qué instala/configura |
 |---|---|---|
-| `setup-base.yml` | Las 7 VMs | Docker Engine + plugin de Compose, dependencias comunes, usuario de despliegue y llaves SSH |
+| `setup-base.yml` | Las 7 VMs | Docker Engine + plugin de Compose, dependencias comunes, usuario de despliegue y llaves SSH, **`node_exporter` y Promtail** (agentes de métricas y logs) |
 | `deploy-db.yml` | VM4 | PostgreSQL + extensión PostGIS, bases y roles iniciales |
 | `deploy-kafka.yml` | VM6 | Apache Kafka + Kafka UI vía Docker Compose |
-| `deploy-k3s.yml` | VM3 | Instalación de k3s (nodo único) y configuración de `kubeconfig` |
+| `deploy-k3s.yml` | VM3 | Instalación de k3s (nodo único), configuración de `kubeconfig`, y bootstrap inicial de los 8 microservicios (ver 3.3) |
 | `deploy-cache.yml` | VM5 | Redis vía Docker Compose |
 | `deploy-gateway.yml` | VM1 | Nginx + configuración del API Gateway |
 | `deploy-runner.yml` | VM1 | Registro e instalación del runner self-hosted de GitHub Actions (servicio systemd), copia del `kubeconfig` de VM3 |
 | `deploy-frontend.yml` | VM2 | Contenedor de Next.js vía Docker Compose |
-| `deploy-storage-observability.yml` | VM7 | MinIO + Prometheus + Grafana + Pino vía Docker Compose |
+| `deploy-storage-observability.yml` | VM7 | MinIO + Prometheus + Loki + Grafana vía Docker Compose (los componentes centrales; `node_exporter`/Promtail van en `setup-base.yml`, no aquí) |
 
 `setup-base.yml` corre primero y en las 7 VMs por igual; los seis restantes son específicos de cada rol y solo tocan su propia VM (vía los grupos del inventario), de forma que aplicar o repetir uno no afecta a las demás.
 
-### 3.3 Ejecución planeada
+> **Nota sobre Pino:** Pino no se instala en ningún lado — es la librería de logging que cada microservicio NestJS usa internamente para escribir sus logs en formato JSON a la salida estándar del contenedor. **Loki** (en VM7) es el componente real que los agrega y almacena; **Promtail** (instalado en las 7 VMs desde `setup-base.yml`) es el agente que los recolecta desde cada contenedor y se los envía a Loki. Grafana consulta Loki igual que consulta Prometheus, en la misma interfaz. El detalle de este flujo se documenta en la sección 8 (Observabilidad).
+
+### 3.3 Bootstrap inicial de los microservicios
+
+Instalar k3s deja el clúster corriendo, pero vacío — ningún microservicio arranca solo. `deploy-k3s.yml` incluye, después de instalar k3s, los pasos para dejar los 8 microservicios corriendo por primera vez:
+
+1. Crear el namespace del proyecto (`kubectl create namespace quickpatch`).
+2. Cargar los `Secret` de Kubernetes con las credenciales necesarias (contraseñas de base de datos, llaves de firma JWT, credenciales de la pasarela de pagos) — nunca en texto plano en los manifiestos.
+3. Cargar los `ConfigMap` con configuración no sensible (URLs internas de Kafka, Redis, etc.).
+4. Crear el `imagePullSecret` con el token de acceso a `ghcr.io` (ver sección 4.4), para que k3s pueda descargar las imágenes de los 8 servicios.
+5. Aplicar los 8 `deployment.yaml` + `service.yaml` de `infrastructure/vm3-k3s/` (sección 4.1) por primera vez.
+
+Después de este bootstrap, cualquier actualización posterior usa el flujo normal de la sección 4.4 (`kubectl set image`), que no repite estos pasos.
+
+### 3.4 Ejecución planeada
 
 ```bash
 ansible-playbook -i inventory.ini setup-base.yml
@@ -194,10 +208,12 @@ Con esto, el uso base de conexiones queda en ~45 de 100, dejando margen real par
 
 ### 4.4 Cómo se despliega o actualiza un microservicio
 
-1. Se construye la imagen Docker del servicio modificado y se sube al registro de imágenes.
+1. Se construye la imagen Docker del servicio modificado y se sube a **GitHub Container Registry (`ghcr.io`)** — gratuito e integrado con el repositorio del proyecto, sin credenciales adicionales que gestionar.
 2. Se actualiza el `deployment.yaml` correspondiente (o se ejecuta `kubectl set image deployment/<servicio> <contenedor>=<nueva-imagen>`).
 3. Kubernetes aplica un *rolling update*: crea el pod nuevo, espera a que pase el `readinessProbe`, y solo entonces retira el pod anterior — sin downtime para ese servicio ni para los demás 7.
 4. El margen de RAM definido en la sección 4.2 es lo que permite que el pod adicional del rolling update quepa sin desalojar a otros servicios.
+
+**Pendiente de definir con datos reales:** los parámetros de `readinessProbe`/`livenessProbe` (tiempos de espera, número de reintentos) y si se necesita un `startupProbe` separado para el arranque. No se fijan valores en esta versión del documento porque dependen del comportamiento real de cada servicio bajo carga, algo que todavía no se ha medido — fijar un número ahora sería una estimación sin sustento, el mismo problema señalado en la sección 2.1.
 
 ---
 
@@ -318,5 +334,94 @@ Regla general: firewall por defecto en denegar todo el tráfico entrante (`ufw d
 ### 7.4 Acceso administrativo (SSH)
 
 Autenticación únicamente por llave pública — login por contraseña deshabilitado en las 7 VMs desde `setup-base.yml`.
+
+---
+
+## 8. Observabilidad
+
+Dos tipos de información, cada uno con su propia cadena de recolección y almacenamiento, unificados en un solo panel:
+
+- **Métricas** (números que cambian en el tiempo: CPU, RAM, peticiones por segundo, errores por minuto) — recolectadas por `node_exporter` en cada VM, almacenadas por Prometheus en VM7.
+- **Logs** (mensajes de texto que describen eventos: "pago rechazado", "acceso denegado") — recolectados por Promtail en cada VM, almacenados por Loki en VM7.
+
+Ninguno de los dos sustituye al otro: las métricas dicen *qué tan rápido u ocupado* está el sistema; los logs dicen *qué pasó exactamente*. Grafana consulta ambas fuentes desde el mismo panel, lo que permite cruzarlos — por ejemplo, ver qué decían los logs justo cuando una métrica de CPU se disparó.
+
+```mermaid
+flowchart LR
+    subgraph VMs["Las 7 VMs"]
+        NE["node_exporter<br/>(métricas de la VM)"]
+        PT["Promtail<br/>(logs de los contenedores)"]
+    end
+    NE -->|"scrape cada ~15s"| PROM["Prometheus<br/>(VM7)"]
+    PT -->|"envío continuo"| LOKI["Loki<br/>(VM7)"]
+    PROM --> GRAF["Grafana<br/>(VM7)"]
+    LOKI --> GRAF
+```
+
+### 8.1 Qué se instala y dónde
+
+| Componente | Dónde | Rol |
+|---|---|---|
+| `node_exporter` | Las 7 VMs (`setup-base.yml`) | Expone las métricas de esa VM para que Prometheus las recolecte |
+| Promtail | Las 7 VMs (`setup-base.yml`) | Recolecta los logs de los contenedores de esa VM y los envía a Loki |
+| Prometheus | VM7 (`deploy-storage-observability.yml`) | Almacena el historial de métricas de las 7 VMs |
+| Loki | VM7 (`deploy-storage-observability.yml`) | Almacena el historial de logs de las 7 VMs |
+| Grafana | VM7 (`deploy-storage-observability.yml`) | Panel único para consultar Prometheus y Loki |
+
+### 8.2 Qué cubre esto en el SRS y el SAD
+
+- **RNF-04** (todo 403 queda en log): el 403 se escribe con Pino/el logger del servicio, Promtail lo recolecta, Loki lo guarda permanentemente — sin esta cadena, el log existiría solo mientras el contenedor no se reinicie, lo cual pasa en cada despliegue.
+- **AC6-E1/E2** (reconstruir una disputa, trazabilidad de pagos): requieren historial persistente de eventos — Loki es lo que hace posible que ese historial sobreviva más allá de la vida de un contenedor.
+- **AC3-E1/E3** (disponibilidad, "límite de capacidad a vigilar" de la sección 2.1): Prometheus + `node_exporter` son el instrumento real para vigilar esa capacidad — sin ellos, "vigilar" no tenía con qué hacerse.
+
+---
+
+## 9. Backup y recuperación
+
+### 9.1 Qué se respalda y qué no
+
+| Dato | ¿Se respalda? | Por qué |
+|---|---|---|
+| PostgreSQL (VM4) | **Sí** | Es la fuente de verdad del negocio — tenants, usuarios, solicitudes, pagos, calificaciones, evidencias registradas. Perderla es perder la plataforma. |
+| Evidencias en MinIO (VM7) | Pendiente de decisión — ver 9.4 | Son archivos, no filas de base de datos; respaldarlas requiere otro lugar donde guardarlas. |
+| Kafka (VM6) | No | Es un bus de mensajes en tránsito, no un sistema de registro. El patrón Outbox (ADR-007) ya garantiza que un evento no se pierde entre que se genera y se publica — no hace falta guardar el historial completo de Kafka aparte. |
+| Redis (VM5) | No | Cache y colas cortas — se reconstruye solo con el uso normal del sistema, no guarda información que no exista también en otro lado. |
+| Configuración de infraestructura (Ansible, manifiestos k3s) | No hace falta un respaldo aparte | Ya vive versionada en el repositorio de Git — el repositorio es su respaldo. |
+
+### 9.2 Respaldo de PostgreSQL
+
+- **Mecanismo:** `pg_dump` programado por cron en VM4, una vez al día.
+- **Destino:** un bucket de MinIO en VM7 — VM distinta a VM4, así un problema en VM4 no se lleva también su propio respaldo.
+- **Retención:** 7 días. Suficiente para el alcance de un proyecto académico de 3 meses (K3); no se justifica una política de retención de nivel empresarial para este contexto.
+
+### 9.3 Recuperación
+
+Restaurar desde el dump más reciente con `pg_restore`. Dado K7 (sin operación 24/7), esta recuperación es **manual**, dentro de la misma ventana de 12–24h ya aceptada para el resto de fallos de infraestructura (ver SAD, sección 5.2) — no hay un mecanismo de restauración automática.
+
+### 9.4 Evidencias en MinIO — sin respaldo, limitación aceptada
+
+MinIO en VM7 es tanto el almacenamiento principal de las evidencias fotográficas como, si algo le pasa a esa VM, el único lugar donde existían — no hay una octava VM para duplicar el storage (K5), y un respaldo manual dependiente de una sola persona no es un mecanismo confiable ni reproducible por el resto del equipo.
+
+**Se documenta como limitación aceptada**, con el mismo tratamiento que el SPOF de VM3 (SAD, sección 5.2): si VM7 falla por completo, las evidencias no respaldadas se pierden. El riesgo residual es la pérdida de evidencia fotográfica de servicios ya completados, no la caída de la plataforma — el ciclo de negocio (RF-15, pagos, calificaciones) no depende de que la evidencia siga disponible después de completado el servicio.
+
+---
+
+## 10. Limitaciones reconocidas
+
+Índice de las limitaciones ya aceptadas a lo largo de este documento y del SAD — no se repiten aquí las justificaciones completas, solo dónde encontrarlas.
+
+| Limitación | Origen | Detalle en |
+|---|---|---|
+| VM3 es punto único de falla (SPOF) | K5 | SAD, sección 5.2; este documento, sección 4.2 |
+| Las 7 VMs tienen la misma especificación sin importar el rol | Laboratorio de la Javeriana | Sección 2.1 |
+| Sin VM dedicada a staging — funcional en CI, carga contra producción | K5 | Sección 5.2; SRS, RNF-07 |
+| La prueba de carga valida después del despliegue, no antes, con reversión si falla | K5 | Sección 5.2/5.3; SRS, RNF-08 |
+| Evidencias en MinIO sin respaldo | K5 | Sección 9.4 |
+| Recuperación manual entre 12 y 24 horas ante cualquier falla | K7 | SAD, sección 5.2 |
+| QoS "Guaranteed" del Matching protege contra desalojo, pero le quita capacidad de ráfaga | Trade-off de diseño | Sección 4.2 |
+| Parámetros de `readinessProbe`/`livenessProbe` sin definir | Falta de datos reales medidos | Sección 4.4 |
+| La sección 2.1 describe un presupuesto de recursos asignado, no uno medido — la validación real llega con el benchmarking del entregable "PoC + ADR" | K3 (alcance académico) | Sección 2.1 |
+
+Ninguna de estas limitaciones se considera un defecto a corregir dentro del alcance de este documento — son restricciones aceptadas conscientemente, consistentes con K3, K5 y K7 del SAD.
 
 ---

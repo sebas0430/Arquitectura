@@ -10,7 +10,7 @@ Ciudad de Bogotá D.C.
 |---|---|
 |**Curso:**|Arquitectura de Software|
 |**Proyecto Jira:**|SCRUM — Arquitectura de Software|
-|**Versión del documento:**|2.2 (MVP)|
+|**Versión del documento:**|2.4 (MVP)|
 |**Estándar de referencia:**|IEEE Std 830-1998|
 |**Fecha:**|3 de septiembre de 2026|
 
@@ -311,8 +311,8 @@ A continuación se listan las **22 Features** identificadas en el backlog, agrup
 
 #### Disponibilidad y Confiabilidad
 
-- **RNF-07** — El sistema debe contar con un ambiente de _staging_ separado del ambiente de producción.
-- **RNF-08** — Un fallo en las pruebas automatizadas del flujo crítico debe bloquear el despliegue a producción.
+- **RNF-07** — El sistema debe contar con un ambiente de _staging_ separado de producción para pruebas funcionales, de aceptación y de seguridad (E2E, UAT, OWASP ZAP). Las pruebas de carga y rendimiento (k6) se ejecutan sobre la infraestructura de producción en una ventana de mantenimiento programada, sin usuarios activos, dado que el proyecto no cuenta con una VM adicional dedicada a staging de carga (K5 — sin presupuesto para VMs adicionales).
+- **RNF-08** — Un fallo en las pruebas automatizadas funcionales, de aceptación o de seguridad del flujo crítico (ejecutadas antes del despliegue, ver RNF-07) debe bloquear el despliegue a producción. La prueba de carga (k6) se ejecuta inmediatamente después del despliegue, dentro de la misma ventana de mantenimiento sin usuarios activos: si no cumple el umbral definido, se revierte el despliegue (`kubectl rollout undo`) antes de habilitar tráfico real, dado que el proyecto no cuenta con una segunda instancia de producción para probar la carga antes de desplegar (K5).
 
 #### Escalabilidad y Arquitectura Multi-tenant
 
@@ -378,6 +378,8 @@ El presente MVP contempla un total de **33 requisitos funcionales**, agrupados e
 |2.0|3 sep 2026|Se elimina el alcance del proyecto ya que no corresponde a este documento. Se agrega el Capítulo de Usuarios del Sistema (independiente); se agrega el Capítulo de Módulos del Producto (dominio y transversales); se agrega la Matriz Comparativa frente a plataformas similares; se reincorpora la sección de Referencias.|
 |2.1|12 sep 2026|Se completa la Épica 7 — Control de Cambios (SCRUM-13): se agregan las Features F7.1–F7.4, los requisitos RF-30 a RF-33 y su trazabilidad en la Matriz de Trazabilidad; se actualizan los totales de la sección 7.2 (33 RF, 26 Features, 7 épicas, 7 módulos transversales).|
 |2.2|12 sep 2026|Se confirma con el equipo que la evidencia fotográfica sí está en el alcance del MVP. Se actualiza RF-15 para exigir al menos una evidencia fotográfica antes de completar el servicio; se actualiza la descripción de F3.2.|
+|2.3|13 sep 2026|Se redefine RNF-07: el ambiente de staging separado cubre pruebas funcionales, de aceptación y de seguridad; las pruebas de carga (k6) se ejecutan sobre producción en ventana de mantenimiento programada, dado que el proyecto no cuenta con una VM adicional dedicada (K5).|
+|2.4|13 sep 2026|Se redefine RNF-08: el bloqueo del despliegue por fallo de pruebas aplica a lo funcional/seguridad (antes de desplegar); la prueba de carga se valida después del despliegue, con reversión automática (`kubectl rollout undo`) si no cumple el umbral, dado que no hay una segunda instancia de producción para probarla antes (K5).|
 
 ---
 
