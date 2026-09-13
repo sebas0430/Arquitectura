@@ -450,7 +450,6 @@ Todas las herramientas seleccionadas para el proyecto cuentan con un plan gratui
 |Pino|Gratis|Open source; librería de logging estructurado para Node.js|
 |ESLint / Prettier|Gratis|Open source|
 |`flutter analyze` / `dart format`|Gratis|Incluido en el SDK de Flutter/Dart|
-|Terraform (Opción B, nube)|Gratis|Open source; el costo real está en los recursos de AWS que provisiona, no en la herramienta|
 |Obsidian|Gratis|Uso personal/no comercial gratuito; sincronización a través del repositorio de Git del proyecto (ver [Redacción de documentos](https://claude.ai/chat/79a9a126-9c5f-4641-bd84-002d21bcb12c#redacci%C3%B3n-de-documentos))|
 
 ---

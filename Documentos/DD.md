@@ -12,7 +12,7 @@ Plataforma Digital Multi-tenant de Servicios Técnicos para el Hogar y las Empre
 |**Servicio Java**|Matching Service — Spring Boot|
 |**Mensajería**|Apache Kafka|
 |**Persistencia**|PostgreSQL + PostGIS|
-|**Versión**|2.0|
+|**Versión**|2.1|
 |**Fecha**|Septiembre de 2026|
 |**Curso**|Arquitectura de Software|
 |**Proyecto**|QUICKPATCH|
@@ -65,12 +65,13 @@ En esta versión se modelan las capacidades relacionadas con:
 - Disponibilidad y cobertura de técnicos.
 - Matching.
 - Calificaciones.
+- Evidencia fotográfica obligatoria al completar un servicio.
 - Pagos.
 - Facturación.
 - Auditoría.
 - Publicación confiable de eventos mediante Kafka.
 
-Funcionalidades futuras como chat, evidencias fotográficas, reclamos, ranking avanzado, inteligencia artificial, payroll-lite o proveedores de materiales no se modelan todavía, debido a que el objetivo de este documento es representar los modelos que pueden justificarse actualmente a partir del SRS del MVP.
+Funcionalidades futuras como chat, reclamos, ranking avanzado, inteligencia artificial, payroll-lite o proveedores de materiales no se modelan todavía, debido a que el objetivo de este documento es representar los modelos que pueden justificarse actualmente a partir del SRS del MVP.
 
 ---
 
@@ -99,7 +100,7 @@ QUICKPATCH utiliza una arquitectura distribuida basada en microservicios. Por es
 |Servicio|Entidades actuales|
 |---|---|
 |Identity & Tenant Service|`tenants`, `users`, `technician_profiles`|
-|Service Request Service|`service_categories`, `service_requests`, `ratings`|
+|Service Request Service|`service_categories`, `service_requests`, `ratings`, `service_evidence`|
 |Matching Service|`technician_availability`, `coverage_zones`, `matching_attempts`|
 |Payment & Billing Service|`payments`, `invoices`|
 |Transversal|`audit_logs`, `outbox_events`|
@@ -129,6 +130,7 @@ erDiagram
     users ||--o| technician_profiles : extiende
     service_categories ||--o{ service_requests : clasifica
     service_requests ||--o| ratings : recibe
+    service_requests ||--o{ service_evidence : requiere
     payments ||--o| invoices : genera
 
     %% ===== Referencias logicas (sin FK fisica, entre microservicios) =====
@@ -136,6 +138,7 @@ erDiagram
     technician_profiles ||--o{ service_requests : "technician_id (ref logica)"
     technician_profiles ||--o| technician_availability : "technician_id (ref logica)"
     technician_profiles ||--o{ coverage_zones : "technician_id (ref logica)"
+    technician_profiles ||--o{ service_evidence : "technician_id (ref logica)"
     service_requests ||--o{ matching_attempts : "service_request_id (ref logica)"
     service_requests ||--o{ payments : "service_request_id (ref logica)"
     users ||--o{ payments : "authorized_by_user_id (ref logica)"
@@ -206,6 +209,15 @@ erDiagram
         INTEGER score
         TEXT comment
         TIMESTAMPTZ created_at
+    }
+
+    service_evidence {
+        UUID id PK
+        UUID tenant_id
+        UUID service_request_id FK
+        UUID technician_id
+        VARCHAR file_url
+        TIMESTAMPTZ uploaded_at
     }
 
     technician_availability {
@@ -448,7 +460,7 @@ _Nota: Mermaid `erDiagram` no distingue visualmente entre línea continua y lín
 
 - Toda solicitud debe tener una ubicación válida.
 - `technician_id` puede ser NULL mientras no exista asignación.
-- Solo se puede pasar a `completado` desde `en_progreso`.
+- Solo se puede pasar a `completado` desde `en_progreso`, y únicamente si existe al menos un registro asociado en `service_evidence`.
 - Solo se puede pasar a `pagado` cuando Payment Service confirme el pago.
 
 **Índices sugeridos:**
@@ -551,7 +563,34 @@ _Nota: Mermaid `erDiagram` no distingue visualmente entre línea continua y lín
 - Una solicitud solo puede calificarse una vez.
 - Solo se permite calificar solicitudes completadas.
 
-### 5.10 Tabla `payments`
+### 5.10 Tabla `service_evidence`
+
+**Servicio propietario:** Service Request Service.
+
+**Propósito:** Registra la evidencia fotográfica que el Técnico adjunta obligatoriamente al completar una solicitud de servicio. El archivo en sí se almacena en MinIO (VM7); esta tabla guarda la referencia.
+
+**Requisitos relacionados:** RF-15.
+
+|Campo|Tipo|Nulo|Clave|Descripción|
+|---|---|---|---|---|
+|id|UUID|No|PK|Identificador único de la evidencia.|
+|tenant_id|UUID|No|—|Tenant relacionado.|
+|service_request_id|UUID|No|FK local|Solicitud a la que pertenece la evidencia.|
+|technician_id|UUID|No|Ref. lógica|Técnico que adjuntó la evidencia.|
+|file_url|VARCHAR(500)|No|—|Referencia al objeto almacenado en MinIO.|
+|uploaded_at|TIMESTAMPTZ|No|—|Fecha y hora en que se subió la evidencia.|
+
+**Reglas de negocio:**
+
+- Una solicitud requiere al menos un registro en esta tabla antes de poder pasar al estado `completado`.
+- Solo el técnico asignado a la solicitud puede subir evidencia para esa solicitud.
+- El archivo referenciado se almacena en MinIO (VM7), no en la base de datos.
+
+**Índices sugeridos:**
+
+- Índice sobre `service_request_id`.
+
+### 5.11 Tabla `payments`
 
 **Servicio propietario:** Payment & Billing Service.
 
@@ -583,7 +622,7 @@ _Nota: Mermaid `erDiagram` no distingue visualmente entre línea continua y lín
 - CVV.
 - Fecha de expiración.
 
-### 5.11 Tabla `invoices`
+### 5.12 Tabla `invoices`
 
 **Servicio propietario:** Payment & Billing Service.
 
@@ -603,7 +642,7 @@ _Nota: Mermaid `erDiagram` no distingue visualmente entre línea continua y lín
 |issued_at|TIMESTAMPTZ|No|—|Fecha de emisión.|
 |pdf_url|VARCHAR(500)|Sí|—|Ruta del comprobante generado.|
 
-### 5.12 Tabla `audit_logs`
+### 5.13 Tabla `audit_logs`
 
 **Servicio propietario:** Transversal.
 
@@ -628,7 +667,7 @@ _Nota: Mermaid `erDiagram` no distingue visualmente entre línea continua y lín
 - `suspender_tecnico`
 - `acceso_denegado`
 
-### 5.13 Tabla `outbox_events`
+### 5.14 Tabla `outbox_events`
 
 **Servicio propietario:** Cada microservicio productor de eventos.
 
@@ -660,6 +699,7 @@ Cuando dos entidades son administradas por el mismo microservicio, pueden implem
 users.tenant_id           -> tenants.id
 service_requests.category_id -> service_categories.id
 ratings.service_request_id   -> service_requests.id
+service_evidence.service_request_id -> service_requests.id
 invoices.payment_id          -> payments.id
 ```
 
@@ -674,6 +714,7 @@ service_requests.client_id            --> users.id
 service_requests.technician_id        --> users.id
 matching_attempts.service_request_id  --> service_requests.id
 payments.service_request_id           --> service_requests.id
+service_evidence.technician_id        --> users.id
 ```
 
 Estas referencias podrán validarse mediante reglas de negocio, contratos REST o eventos.
@@ -696,6 +737,7 @@ El presente documento registra únicamente los contratos que actualmente pueden 
 |POST|`/v1/service-requests`|Crear solicitud de servicio.|
 |GET|`/v1/service-requests/{id}`|Consultar una solicitud.|
 |POST|`/v1/service-requests/{id}/start`|Iniciar servicio.|
+|POST|`/v1/service-requests/{id}/evidence`|Adjuntar evidencia fotográfica del servicio (requerida antes de completar).|
 |POST|`/v1/service-requests/{id}/complete`|Completar servicio.|
 |POST|`/v1/service-requests/{id}/rating`|Calificar servicio.|
 |POST|`/v1/service-requests/{id}/payment`|Procesar pago.|
@@ -761,7 +803,6 @@ Durante nuevos Sprint podrán incorporarse nuevas entidades cuando exista una Hi
 
 Algunos modelos que podrían aparecer en versiones futuras son:
 
-- Evidencias fotográficas.
 - Chat.
 - Reclamos.
 - Ranking avanzado.
@@ -780,7 +821,8 @@ La inclusión de estos modelos no se considera comprometida en esta versión del
 |---|---|---|
 |1.0|Diseño inicial|Modelo inicial basado en usuarios, solicitudes, matching, pagos y multi-tenancy.|
 |2.0|Revisión arquitectónica|Adaptación del modelo a una solución distribuida, definición de propiedad de datos por servicio y contratos mediante Kafka.|
-|2.1|Futuros Sprint|Se agregarán nuevas entidades, campos y relaciones conforme las Historias de Usuario lo requieran.|
+|2.1|Confirmación de alcance (evidencias)|Se confirma con el equipo que la evidencia fotográfica está en el alcance del MVP; se agrega la tabla `service_evidence`, el endpoint `POST /v1/service-requests/{id}/evidence`, y la regla de negocio que exige al menos una evidencia para completar una solicitud.|
+|2.2|Futuros Sprint|Se agregarán nuevas entidades, campos y relaciones conforme las Historias de Usuario lo requieran.|
 
 _Cuadro 17: Evolución del diccionario de datos_
 
@@ -805,6 +847,7 @@ En esta versión se dispone de un modelo inicial suficiente para soportar:
 - disponibilidad;
 - zonas de cobertura;
 - calificaciones;
+- evidencias fotográficas;
 - pagos;
 - facturación;
 - auditoría;

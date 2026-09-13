@@ -10,7 +10,7 @@ Ciudad de Bogotá D.C.
 |---|---|
 |**Curso:**|Arquitectura de Software|
 |**Proyecto Jira:**|SCRUM — Arquitectura de Software|
-|**Versión del documento:**|2.0 (MVP)|
+|**Versión del documento:**|2.2 (MVP)|
 |**Estándar de referencia:**|IEEE Std 830-1998|
 |**Fecha:**|3 de septiembre de 2026|
 
@@ -140,6 +140,7 @@ El sistema se organiza en dos tipos de módulos: los **módulos de dominio**, qu
 |Notificaciones|Envío de confirmaciones y alertas (correo/notificación en app) usadas por Registro, Matching, Seguimiento y Pagos.|Transversal a SCRUM-7, 8, 11|
 |Logging y Monitoreo|Registro centralizado de errores y alertas de disponibilidad, usado por todos los módulos del sistema.|SCRUM-12 (F6.3)|
 |Integración y Despliegue Continuo (CI/CD)|Infraestructura de build, pruebas automáticas y despliegue que da soporte al desarrollo de todos los módulos anteriores.|SCRUM-12 (F6.1, F6.2)|
+|Control de Cambios y Documentación|Versionamiento semántico, changelog y actualización controlada de la documentación formal del proyecto; gobierna la evolución de todos los módulos anteriores.|SCRUM-13 (F7.1–F7.4)|
 
 ### 4.3 Relación entre módulos transversales y módulos de dominio
 
@@ -151,6 +152,7 @@ El sistema se organiza en dos tipos de módulos: los **módulos de dominio**, qu
 |Notificaciones|Gestión de Usuarios, Solicitudes y Matching, Pagos y Facturación.|
 |Logging y Monitoreo|Todos los módulos de dominio.|
 |CI/CD|Todos los módulos de dominio (indirectamente, como infraestructura de entrega).|
+|Control de Cambios y Documentación|Todos los módulos de dominio y transversales (gobierna su versionamiento y documentación).|
 
 ---
 
@@ -185,7 +187,7 @@ A continuación se listan las **22 Features** identificadas en el backlog, agrup
 |Feature (Jira label)|Descripción|Requisitos|HU (Jira)|
 |---|---|---|---|
 |F3.1 — Perfil y Disponibilidad|Configuración de disponibilidad y zona de cobertura del Técnico.|RF-13|SCRUM-33|
-|F3.2 — Gestión de Servicios Asignados|Consulta de detalle y cierre (completado) de una solicitud asignada.|RF-14, RF-15|SCRUM-34, 35|
+|F3.2 — Gestión de Servicios Asignados|Consulta de detalle y cierre (completado, con evidencia fotográfica obligatoria) de una solicitud asignada.|RF-14, RF-15|SCRUM-34, 35|
 |F3.3 — Gestión de Equipo (Proveedor)|Administración del equipo de técnicos por parte de un Proveedor.|RF-16|SCRUM-36|
 |F3.4 — Historial de Servicios|Consulta del historial de solicitudes atendidas por el Técnico.|RF-17|SCRUM-37|
 
@@ -214,7 +216,14 @@ A continuación se listan las **22 Features** identificadas en el backlog, agrup
 |F6.3 — Monitoreo y Logging|Registro centralizado de errores y alertas básicas de caída de servicio.|RF-28|SCRUM-48|
 |F6.4 — Seguridad de Datos|Cifrado de datos sensibles en tránsito y en reposo.|RF-29|SCRUM-49|
 
-#### Épica 7 — Control de cambios - EQUIPO
+#### Épica 7 — Control de Cambios (SCRUM-13)
+
+|Feature (Jira label)|Descripción|Requisitos|HU (Jira)|
+|---|---|---|---|
+|F7.1 — Versionamiento Semántico|Etiquetado de cada entrega siguiendo SemVer y GitFlow.|RF-30|SCRUM-50|
+|F7.2 — Registro de Cambios (Changelog)|Documentación de los cambios funcionales y de arquitectura entre versiones.|RF-31|SCRUM-51|
+|F7.3 — Control de Documentación|Actualización versionada de los documentos formales (SAD, SRS, DD, PyH) en cada entrega.|RF-32|SCRUM-52|
+|F7.4 — Trazabilidad Jira-GitHub|Vinculación de Issues técnicos a historias de Jira y cierre formal en el tablero Kanban.|RF-33|SCRUM-53|
 
 ### 5.2 Requisitos Funcionales
 
@@ -246,7 +255,7 @@ A continuación se listan las **22 Features** identificadas en el backlog, agrup
 |---|---|---|---|---|
 |RF-13|El sistema debe permitir al Técnico configurar su disponibilidad y zona de cobertura.|Alta|F3.1|SCRUM-33|
 |RF-14|El sistema debe mostrar al Técnico el detalle completo de una solicitud asignada.|Alta|F3.2|SCRUM-34|
-|RF-15|El sistema debe permitir al Técnico marcar una solicitud como completada, habilitando el proceso de pago.|Alta|F3.2|SCRUM-35|
+|RF-15|El sistema debe permitir al Técnico marcar una solicitud como completada únicamente después de adjuntar al menos una evidencia fotográfica del trabajo realizado, habilitando el proceso de pago.|Alta|F3.2|SCRUM-35|
 |RF-16|El sistema debe permitir al Proveedor registrar y administrar su equipo de técnicos.|Media|F3.3|SCRUM-36|
 |RF-17|El sistema debe mostrar al Técnico el historial de solicitudes atendidas.|Media|F3.4|SCRUM-37|
 
@@ -276,6 +285,15 @@ A continuación se listan las **22 Features** identificadas en el backlog, agrup
 |RF-27|El sistema debe contar con una prueba automatizada end-to-end del flujo crítico (solicitud → pago → calificación).|Alta|F6.2|SCRUM-47|
 |RF-28|El sistema debe registrar logs centralizados de errores y contar con alertas básicas de caída de servicio.|Media|F6.3|SCRUM-48|
 |RF-29|El sistema debe cifrar los datos sensibles en tránsito (HTTPS/TLS) y en reposo (contraseñas con hash seguro).|Alta|F6.4|SCRUM-49|
+
+#### Épica 7 — Control de Cambios (SCRUM-13)
+
+|ID|Descripción|Prior.|Feature|Jira|
+|---|---|---|---|---|
+|RF-30|El equipo debe versionar cada entrega siguiendo SemVer (MAYOR.MENOR.PARCHE) y etiquetar el repositorio al cerrar cada sprint.|Alta|F7.1|SCRUM-50|
+|RF-31|El equipo debe mantener un registro de cambios (changelog) documentando las modificaciones funcionales y de arquitectura entre versiones.|Media|F7.2|SCRUM-51|
+|RF-32|El equipo debe actualizar los documentos formales (SAD, SRS, DD, Políticas y Herramientas) en cada entrega de sprint, manteniendo su número de versión sincronizado con el estado del backlog.|Alta|F7.3|SCRUM-52|
+|RF-33|El equipo debe vincular cada Issue de GitHub a su historia de Jira correspondiente y cerrar la tarjeta en el tablero Kanban solo tras cierre formal.|Media|F7.4|SCRUM-53|
 
 ### 5.3 Requisitos No Funcionales
 
@@ -345,10 +363,11 @@ Con el fin de justificar el enfoque del producto, se comparó QUICKPATCH frente 
 |SCRUM-10 — Panel Administrativo|F4.1 – F4.3|RF-18 – RF-21|SCRUM-38 a SCRUM-41|
 |SCRUM-11 — Pagos PCI-DSS y Facturación|F5.1 – F5.3|RF-22 – RF-25|SCRUM-42 a SCRUM-45|
 |SCRUM-12 — Infraestructura y QA|F6.1 – F6.4|RF-26 – RF-29|SCRUM-46 a SCRUM-49|
+|SCRUM-13 — Control de Cambios|F7.1 – F7.4|RF-30 – RF-33|SCRUM-50 a SCRUM-53|
 
 ### 7.2 Resumen de Requisitos Funcionales
 
-El presente MVP contempla un total de **29 requisitos funcionales**, agrupados en **22 Features**, organizados en **7 módulos de dominio** y soportados por **6 módulos transversales**, distribuidos en 6 épicas. Todos los requisitos están priorizados como _Alta_ o _Media_ por ser esenciales para demostrar el ciclo completo del negocio: registro y autenticación multi-tenant, solicitud de servicio, asignación automática, ejecución técnica, pago seguro y calificación.
+El presente MVP contempla un total de **33 requisitos funcionales**, agrupados en **26 Features**, organizados en **7 módulos de dominio** y soportados por **7 módulos transversales**, distribuidos en **7 épicas**. Todos los requisitos están priorizados como _Alta_ o _Media_ por ser esenciales para demostrar el ciclo completo del negocio: registro y autenticación multi-tenant, solicitud de servicio, asignación automática, ejecución técnica, pago seguro y calificación; la Épica 7 (Control de Cambios) gobierna adicionalmente el versionamiento y la documentación de las seis épicas anteriores.
 
 ### 7.3 Control de Versiones del Documento
 
@@ -357,6 +376,8 @@ El presente MVP contempla un total de **29 requisitos funcionales**, agrupados e
 |1.0|15 ago 2026|Versión inicial del SRS, derivada del backlog MVP registrado en Jira (proyecto SCRUM).|
 |2.0|31 ago 2026|Se incorpora el nombre del producto (QUICKPATCH); se agrega la sección de Features del sistema y su trazabilidad a requisitos e historias de usuario.|
 |2.0|3 sep 2026|Se elimina el alcance del proyecto ya que no corresponde a este documento. Se agrega el Capítulo de Usuarios del Sistema (independiente); se agrega el Capítulo de Módulos del Producto (dominio y transversales); se agrega la Matriz Comparativa frente a plataformas similares; se reincorpora la sección de Referencias.|
+|2.1|12 sep 2026|Se completa la Épica 7 — Control de Cambios (SCRUM-13): se agregan las Features F7.1–F7.4, los requisitos RF-30 a RF-33 y su trazabilidad en la Matriz de Trazabilidad; se actualizan los totales de la sección 7.2 (33 RF, 26 Features, 7 épicas, 7 módulos transversales).|
+|2.2|12 sep 2026|Se confirma con el equipo que la evidencia fotográfica sí está en el alcance del MVP. Se actualiza RF-15 para exigir al menos una evidencia fotográfica antes de completar el servicio; se actualiza la descripción de F3.2.|
 
 ---
 

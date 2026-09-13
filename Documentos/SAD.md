@@ -1,4 +1,4 @@
-# Documento de Arquitectura de Software (SAD) V1 — TécnicoCerca
+# Documento de Arquitectura de Software (SAD) V1 — QUICKPATCH
 
 ---
 
@@ -42,6 +42,11 @@ Los atributos de calidad expresan, en términos medibles, las propiedades que el
 |AC4|Escalabilidad|D5|
 |AC5|Mantenibilidad|K3|
 |AC6|Trazabilidad / Auditabilidad|D8|
+|AC7|Capacidad de Interacción|ISO/IEC 25010:2023 — RNF-11, RNF-12|
+|AC8|Compatibilidad|ISO/IEC 25010:2023 — RIE-01, RIE-02, RIE-03|
+|AC9|Flexibilidad|ISO/IEC 25010:2023 — ADR-002, RNF-09|
+
+> AC7–AC9 no derivan directamente de un driver o killer de negocio (sección 1), sino de los atributos de calidad genéricos de la norma **ISO/IEC 25010:2023**, aplicados a los requisitos no funcionales y de interfaz externa ya definidos en el SRS.
 
 ---
 
@@ -273,7 +278,7 @@ Cada escenario se clasifica en uno de tres tipos:
 |Estímulo|Recibe un reclamo de un cliente sobre un servicio específico|
 |Ambiente|Operación normal|
 |Artefacto|Registro de eventos del ciclo de vida del servicio|
-|Respuesta|Puede reconstruir la línea de tiempo completa del servicio (cotización, aceptación, entrega, evaluación)|
+|Respuesta|Puede reconstruir la línea de tiempo completa del servicio (cotización, aceptación, entrega, evaluación), incluyendo la evidencia fotográfica adjuntada por el técnico al completar el servicio|
 |Medida|100% de las transiciones de estado del servicio quedan registradas, sin pasos faltantes en la secuencia|
 
 **Escenario 2 — Registro de cambios en pagos** · _Tipo: Uso_
@@ -298,7 +303,79 @@ Cada escenario se clasifica en uno de tres tipos:
 |Respuesta|El efecto del evento se aplica una sola vez, pese a llegar duplicado|
 |Medida|0 efectos duplicados (ej. doble notificación, doble cálculo de ranking), verificable por `eventId`|
 
-### 3.7 Priorización de escenarios
+### 3.7 AC7 — Capacidad de Interacción
+
+**Escenario 1 — Creación de solicitud en pocos pasos** · _Tipo: Uso_
+
+|Parte|Contenido|
+|---|---|
+|Fuente|Cliente|
+|Estímulo|Inicia el flujo de creación de una solicitud de servicio|
+|Ambiente|Operación normal, desde la app móvil|
+|Artefacto|Interfaz de creación de solicitud|
+|Respuesta|Completa el flujo indicando categoría, dirección y descripción|
+|Medida|100% de las solicitudes se crean en un máximo de 3 pasos (RNF-11)|
+
+**Escenario 2 — Uso en distintos dispositivos** · _Tipo: Uso_
+
+|Parte|Contenido|
+|---|---|
+|Fuente|Cualquier usuario autenticado (Cliente, Técnico, Admin)|
+|Estímulo|Accede a la plataforma desde un dispositivo móvil o de escritorio|
+|Ambiente|Operación normal|
+|Artefacto|Interfaces Next.js (panel admin) y Flutter (app móvil)|
+|Respuesta|La interfaz se adapta al tamaño de pantalla sin pérdida de funcionalidad|
+|Medida|100% de las pantallas son utilizables sin scroll horizontal ni elementos cortados en los tamaños soportados (RNF-12)|
+
+### 3.8 AC8 — Compatibilidad
+
+**Escenario 1 — Integración con la pasarela de pagos externa** · _Tipo: Uso_
+
+|Parte|Contenido|
+|---|---|
+|Fuente|Cliente o Empresa|
+|Estímulo|Confirma el pago de un servicio|
+|Ambiente|Operación normal|
+|Artefacto|Integración con la pasarela de pagos certificada PCI-DSS (RIE-01)|
+|Respuesta|El sistema envía la solicitud de cobro en el formato esperado por la pasarela y procesa la respuesta sin errores de interoperabilidad|
+|Medida|100% de las transacciones se procesan sin errores de formato o protocolo con la pasarela|
+
+**Escenario 2 — Cambio de proveedor de geolocalización** · _Tipo: Cambio_
+
+|Parte|Contenido|
+|---|---|
+|Fuente|Equipo de desarrollo|
+|Estímulo|Se requiere reemplazar el servicio de mapas/geocodificación actual (RIE-02) por otro proveedor|
+|Ambiente|Evolución del sistema|
+|Artefacto|Módulo de integración de geolocalización (Matching Service)|
+|Respuesta|El cambio se limita a la capa de integración externa, sin afectar la lógica de negocio del matching|
+|Medida|El reemplazo del proveedor no requiere cambios en los demás microservicios|
+
+### 3.9 AC9 — Flexibilidad
+
+**Escenario 1 — Incorporación de un nuevo canal o tipo de cliente** · _Tipo: Cambio_
+
+|Parte|Contenido|
+|---|---|
+|Fuente|Equipo de desarrollo|
+|Estímulo|Se evalúa agregar un nuevo cliente (ej. una versión web para Clientes, no solo para Admin)|
+|Ambiente|Evolución del sistema más allá del alcance académico actual|
+|Artefacto|API Gateway y contratos REST/eventos existentes|
+|Respuesta|El nuevo cliente consume los mismos contratos ya definidos, sin requerir cambios en los microservicios de dominio|
+|Medida|0 cambios de código en los microservicios de dominio para incorporar un nuevo tipo de cliente|
+
+**Escenario 2 — Nuevo tenant con reglas propias** · _Tipo: Cambio_
+
+|Parte|Contenido|
+|---|---|
+|Fuente|Equipo administrador de la plataforma|
+|Estímulo|Un nuevo tenant requiere una variación menor de reglas de negocio (ej. categorías de servicio propias)|
+|Ambiente|Operación normal, crecimiento del negocio|
+|Artefacto|Modelo de datos multi-tenant (`tenant_id`) y catálogo de categorías|
+|Respuesta|La variación se resuelve mediante configuración y datos propios del tenant, no mediante cambios de código|
+|Medida|El aislamiento de los tenants existentes (RNF-09) no se ve afectado|
+
+### 3.10 Priorización de escenarios
 
 Siguiendo el método ATAM, cada escenario se prioriza en dos ejes votados por separado, cada uno desde una perspectiva distinta:
 
@@ -330,6 +407,12 @@ Solo los escenarios que califican Alta en ambos ejes se consideran **prioritario
 |AC6-E1 Reconstrucción de una disputa|Trazabilidad|Alta|Media|**Alta**|
 |AC6-E2 Registro de cambios en pagos|Trazabilidad|Alta|Baja|Media|
 |AC6-E3 Evento duplicado por reintento|Trazabilidad|Alta|Alta|**Alta**|
+|AC7-E1 Creación de solicitud en pocos pasos|Capacidad de Interacción|Media|Baja|Baja|
+|AC7-E2 Uso en distintos dispositivos|Capacidad de Interacción|Media|Baja|Baja|
+|AC8-E1 Integración con pasarela de pagos|Compatibilidad|Media|Media|Media|
+|AC8-E2 Cambio de proveedor de geolocalización|Compatibilidad|Baja|Baja|Baja|
+|AC9-E1 Nuevo canal o tipo de cliente|Flexibilidad|Alta|Media|**Alta**|
+|AC9-E2 Nuevo tenant con reglas propias|Flexibilidad|Media|Media|Media|
 
 ---
 
@@ -373,7 +456,7 @@ flowchart TB
         S5["ServiceRequest Service<br/>orquesta ciclo de vida"]
         S6["Ranking Service<br/>servicio + materiales"]
         S7["Payments Service<br/>Payments . Billing . Payroll-lite"]
-        S8["Communication Service<br/>Chat . Notifications . Complaints"]
+        S8["Communication Service<br/>Notifications<br/>(Chat . Complaints: futuro)"]
     end
 
     GW --> Services
@@ -384,6 +467,7 @@ flowchart TB
 
     Services --> DB[("PostgreSQL + PostGIS<br/>por servicio o esquema")]
     Services --> CACHE[("Redis<br/>cache / colas cortas")]
+    Services --> STORAGE[("MinIO<br/>archivos y evidencias")]
 ```
 
 ### 4.2 Componentes
@@ -408,7 +492,7 @@ Cada servicio es responsable de un dominio de negocio, con su propio ciclo de de
 |ServiceRequest Service|ServiceRequest (orquesta cotización → prestación → evaluación)|
 |Ranking Service|Ranking (servicio prestado y materiales, ver D2)|
 |Payments Service|Payments, Billing, Payroll-lite|
-|Communication Service|Chat, Notifications, Complaints|
+|Communication Service|Notifications (Chat y Complaints planificados para versiones futuras — ver Roadmap 1.x, fuera del alcance del MVP)|
 
 #### 4.2.3 Persistencia
 
@@ -445,7 +529,9 @@ Esta sección describe cómo se distribuye el sistema sobre las 7 VMs propias (K
 |VM4|10.43.98.209|Base de datos|PostgreSQL + PostGIS (fuente de verdad, incluye datos geoespaciales)|
 |VM5|10.43.98.29|Cache / colas cortas|Redis (BullMQ para trabajos programados)|
 |VM6|10.43.99.12|Mensajería asíncrona|Apache Kafka + Kafka UI (matching, ranking, notificaciones, pagos)|
-|VM7|10.43.99.8|Storage + Observabilidad|MinIO (evidencias fotográficas) + logs estructurados / métricas|
+|VM7|10.43.99.8|Storage + Observabilidad|MinIO (evidencias fotográficas obligatorias al completar un servicio, ver RF-15) + logs estructurados / métricas|
+
+> **Nota sobre storage de evidencias (MinIO vs. Cloudflare R2):** confirmado con el equipo que la evidencia fotográfica sí está en el alcance del MVP. El storage se aprovisiona como **MinIO self-hosted en VM7**, consistente con K5 (sin presupuesto para servicios cloud administrados). El diagrama de la presentación de Sprint 1 mostraba "MinIO / Cloudflare R2" como si fueran intercambiables; se descarta Cloudflare R2 para esta versión precisamente por K5 — es un servicio externo, aunque su free tier no tenga costo. Si en el futuro se reconsidera, debe evaluarse explícitamente contra K5 antes de adoptarlo.
 
 Dado K5 (sin presupuesto para VMs adicionales), los 8 microservicios no reciben una VM cada uno. Los 8 corren dentro de VM3, orquestados con Kubernetes (k3s, clúster de un solo nodo), lo que permite escalado independiente por servicio, auto-healing y rolling updates sin downtime — ver ADR-011 (sección 5.7) y ADR-003 (sección 6).
 
@@ -579,7 +665,7 @@ Esta sección describe el modelo de negocio en términos conceptuales — actore
 
 ### 7.1 Modelo de tenants
 
-TécnicoCerca se concibe como una plataforma SaaS multi-tenant. La empresa dueña original de la plataforma es el primer tenant, pero el diseño contempla que otras empresas se sumen como tenants independientes a futuro, cada una con sus propios datos, usuarios, técnicos y catálogo de servicios aislados entre sí (ver D5, sustento de AC2 y AC4).
+QUICKPATCH se concibe como una plataforma SaaS multi-tenant. La empresa dueña original de la plataforma es el primer tenant, pero el diseño contempla que otras empresas se sumen como tenants independientes a futuro, cada una con sus propios datos, usuarios, técnicos y catálogo de servicios aislados entre sí (ver D5, sustento de AC2 y AC4).
 
 ### 7.2 Actores y roles
 
