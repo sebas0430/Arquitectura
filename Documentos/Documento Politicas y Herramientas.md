@@ -439,15 +439,28 @@ Todas las herramientas seleccionadas para el proyecto cuentan con un plan gratui
 |Miro|Gratis (con límites)|Plan Free permanente, hasta 3 tableros editables, miembros ilimitados — suficiente para sesiones puntuales de mapeo|
 |GitHub|Gratis|Repositorios privados y públicos ilimitados; minutos incluidos de GitHub Actions en el plan gratuito|
 |GitHub Actions|Gratis (con límites)|Incluido dentro del plan gratuito de GitHub; minutos limitados al mes en repos privados, ilimitado en repos públicos|
+|GitHub Container Registry (`ghcr.io`)|Gratis|Incluido con el plan gratuito de GitHub; registro de las imágenes Docker de los 8 microservicios|
 |Docker / Docker Compose|Gratis|Open source|
+|Ansible|Gratis|Open source; aprovisiona las 7 VMs desde un solo inventario (ver Documento de Infraestructura, sección 5)|
+|k3s|Gratis|Open source; distribución liviana de Kubernetes que orquesta los 8 microservicios en VM3|
+|Nginx|Gratis|Open source; API Gateway y terminación TLS en VM1|
 |Mermaid|Gratis|Open source; renderiza directamente en GitHub sin instalación|
 |PostgreSQL + PostGIS|Gratis|Open source|
 |Redis|Gratis|Open source|
 |Apache Kafka|Gratis|Open source|
 |Kafka UI|Gratis|Open source; interfaz de inspección de topics y consumidores|
 |MinIO|Gratis|Open source (self-hosted)|
-|Prometheus + Grafana|Gratis|Open source; self-hosted, sin límite de usuarios|
-|Pino|Gratis|Open source; librería de logging estructurado para Node.js|
+|Prometheus + Grafana|Gratis|Open source; self-hosted, sin límite de usuarios — métricas|
+|`node_exporter`|Gratis|Open source; agente de métricas de sistema operativo en cada una de las 7 VMs|
+|Loki|Gratis|Open source; almacena el historial de logs agregados de las 7 VMs|
+|Promtail|Gratis|Open source; agente que recolecta los logs de cada VM y los envía a Loki|
+|Pino|Gratis|Open source; librería de logging estructurado para Node.js — logs de aplicación|
+|Testcontainers|Gratis|Open source; levanta PostgreSQL/PostGIS y Kafka reales en Docker para las pruebas de integración de `develop`|
+|Pact|Gratis (con límites)|Pact Broker en la nube tiene plan gratuito; pruebas de contrato entre Flutter/Next.js y la API de NestJS|
+|Playwright|Gratis|Open source; pruebas E2E del panel web en `release/*`|
+|Patrol|Gratis|Open source; pruebas E2E de la app Flutter en `release/*`|
+|k6|Gratis|Open source; prueba de carga (150 matchings concurrentes) contra VM3 real, en ventana de mantenimiento|
+|OWASP ZAP|Gratis|Open source; escaneo de seguridad automático en el gate de `release/*`|
 |ESLint / Prettier|Gratis|Open source|
 |`flutter analyze` / `dart format`|Gratis|Incluido en el SDK de Flutter/Dart|
 |Obsidian|Gratis|Uso personal/no comercial gratuito; sincronización a través del repositorio de Git del proyecto (ver [Redacción de documentos](https://claude.ai/chat/79a9a126-9c5f-4641-bd84-002d21bcb12c#redacci%C3%B3n-de-documentos))|
@@ -543,6 +556,21 @@ El equipo utiliza herramientas de IA como apoyo durante el desarrollo. Esta secc
 - Exploración de alternativas de diseño — como apoyo para pensar, no como decisión final.
 
 **No se usa para:** decisiones de arquitectura, diseño del modelo de datos, ni lógica de negocio crítica (cálculo de pagos, reglas de PCI-DSS, aislamiento multi-tenant) sin que el equipo las piense, valide y entienda primero — la IA puede ayudar a redactarlas o explorarlas, pero la decisión final es del equipo.
+
+### Contexto persistente: `CLAUDE.md`
+
+El repositorio incluye un archivo **`CLAUDE.md`** en su raíz, pensado como memoria de proyecto para asistentes de IA con soporte para este tipo de archivo (Claude Code, y cualquier herramienta equivalente que lo reconozca). Su objetivo es que el equipo no tenga que reexplicar el contexto del proyecto — equipo, arquitectura, restricciones (killers), infraestructura, convenciones de Git y esta misma política de uso de IA — cada vez que arranca una conversación nueva con la IA.
+
+**Qué contiene:** un resumen del proyecto (QUICKPATCH, actores, flujo de negocio), del equipo (roles, canales de comunicación), de la arquitectura de software (drivers, killers, atributos de calidad, ADRs), de la infraestructura (inventario de VMs, stack técnico), de GitFlow y convenciones de commits, y de esta política de uso de IA. No repite el contenido completo de los documentos formales (SAD, SRS, DD, Documento de Infraestructura, este documento) — los resume y referencia por sección, de forma que la IA sepa dónde buscar el detalle si lo necesita en vez de asumirlo.
+
+**Quién lo mantiene y cuándo se actualiza:** el rol de DevOps mantiene `CLAUDE.md` actualizado cada vez que cambia una decisión relevante de arquitectura, infraestructura o proceso de equipo. Vive versionado en Git como cualquier otro archivo del repositorio, y sus cambios se revisan en Pull Request igual que el resto de la documentación (ver [Pull Requests](https://claude.ai/chat/79a9a126-9c5f-4641-bd84-002d21bcb12c#pull-requests)).
+
+**Reglas específicas:**
+
+- `CLAUDE.md` es un resumen de apoyo, no la fuente de verdad: ante cualquier discrepancia, manda el documento formal correspondiente (SAD, SRS, DD, Documento de Infraestructura), no lo que diga `CLAUDE.md`.
+- Nunca contiene credenciales, tokens, API keys ni datos reales de clientes — aplica la misma regla que la sección [Qué no se comparte con herramientas de IA](https://claude.ai/chat/79a9a126-9c5f-4641-bd84-002d21bcb12c#qu%C3%A9-no-se-comparte-con-herramientas-de-ia).
+- Se actualiza como parte del mismo cambio que la motiva (ej. si un PR modifica una decisión de infraestructura, ese mismo PR actualiza la referencia correspondiente en `CLAUDE.md`), no como una tarea aparte que se posterga y queda desincronizada.
+- Al ser un archivo más del repositorio, cualquier persona del equipo puede proponerle cambios por PR — no es exclusivo del rol de DevOps, aunque DevOps lo revisa por ser quien mantiene la visión más completa del estado operativo del proyecto.
 
 ### Revisión humana obligatoria
 
