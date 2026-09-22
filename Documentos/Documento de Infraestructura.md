@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Tipo de documento** | Manual operativo de infraestructura |
-| **Versión** | 1.2 |
+| **Versión** | 1.3 |
 | **Curso** | Arquitectura de Software |
 | **Proyecto** | QUICKPATCH |
 
@@ -34,7 +34,8 @@ Este documento describe cómo se construye, despliega y opera la infraestructura
 - Decisiones de arquitectura de software y sus trade-offs (ver SAD).
 - Modelo de datos y contratos de API/eventos (ver DD).
 - Políticas de equipo, GitFlow y estilo de código (ver Políticas y Herramientas).
-- El diagrama de despliegue conceptual y el benchmarking de infraestructura (ver Vista Física, SDD).
+- La vista física conceptual (SAD, sección 5): este documento cubre su despliegue operativo (sección 2).
+- El benchmarking de infraestructura (entregable "PoC + ADR").
 
 ---
 
@@ -84,7 +85,7 @@ flowchart TB
 
 ### 2.2 Principios de la arquitectura de despliegue
 
-- **Sin servicios administrados en la nube (K5):** todo el sistema corre en las 7 VMs propias asignadas por el laboratorio de la Javeriana; no hay bases de datos, colas ni cómputo administrado por un proveedor cloud.
+- **Sin servicios administrados en la nube (K5, K10):** todo el sistema corre en las 7 VMs propias asignadas por el laboratorio de la Javeriana; no hay bases de datos, colas ni cómputo administrado por un proveedor cloud.
 - **Un rol productivo por VM, salvo VM3 y VM7:** cada VM aloja un componente principal (gateway, frontend, base de datos, cache, mensajería); VM3 concentra los 8 microservicios vía k3s (ADR-011) y VM7 combina storage (MinIO) y observabilidad (Prometheus/Loki/Grafana) porque no hay presupuesto para una octava VM (K5).
 - **Compose fuera de VM3, Kubernetes solo dentro de VM3:** el resto de VMs usa Docker Compose por simplicidad operativa; solo el backend justifica la complejidad de k3s, por necesitar rolling updates y auto-healing independientes por microservicio (ver sección 5).
 - **Automatizado, no manual:** el aprovisionamiento de las 7 VMs y el despliegue de cada componente se hacen con Ansible (sección 5), no a mano, dado que una sola persona (DevOps) administra las 7 máquinas (SAD, sección 5.3).
@@ -108,7 +109,7 @@ Las 7 VMs son asignadas por el laboratorio de virtualización de la Pontificia U
 | RAM | 11 GiB |
 | Disco | 68 GB (50 GB disponibles al aprovisionar) |
 
-> Las 7 VMs tienen la misma asignación de recursos independientemente de su rol. En particular, VM3 aloja los 8 microservicios sobre k3s con la misma RAM disponible que VM5, que solo corre Redis. El presupuesto de CPU/RAM asignado a cada microservicio (sección 5.6) es una estimación de diseño, no una medición real — todavía no existen manifiestos ni datos de carga contra el hardware real. Se vigila con las métricas de Prometheus/`node_exporter` (sección 7) contra los umbrales de AC1-E4 y AC4-E3 del SAD, y se valida de forma definitiva con el benchmarking del entregable "PoC + ADR" (sección 10).
+> Las 7 VMs tienen la misma asignación de recursos independientemente de su rol. En particular, VM3 aloja los 8 microservicios sobre k3s con la misma RAM disponible que VM5, que solo corre Redis. El presupuesto de CPU/RAM asignado a cada microservicio (sección 5.6) es una estimación de diseño, no una medición real — todavía no existen manifiestos ni datos de carga contra el hardware real. Se vigila con las métricas de Prometheus/`node_exporter` (sección 7) contra los umbrales de AC2-E4, AC2-E5 y AC8-E2 del SAD, y se valida de forma definitiva con el benchmarking del entregable "PoC + ADR" (sección 13).
 
 ### 3.2 Detalle por VM
 
@@ -135,7 +136,7 @@ Las 7 VMs son asignadas por el laboratorio de virtualización de la Pontificia U
 | QA / Staging | Runner de GitHub Actions (`docker-compose.staging.yml`) + VM3 real para la prueba de carga | Efímero (funcional) / real y programado (carga) | E2E, UAT, seguridad (automático) — carga con k6 (manual, ventana programada) |
 | Producción | Las 7 VMs | Persistente, siempre activo | El sistema completo, tráfico real |
 
-Ningún ambiente además de Producción ocupa hardware dedicado y permanente — es la consecuencia directa de K5 (sin presupuesto para VMs adicionales): Dev y la parte funcional de Staging existen solo durante la ejecución del pipeline, no como servidores que alguien tiene que mantener corriendo.
+Ningún ambiente además de Producción ocupa hardware dedicado y permanente — es la consecuencia directa de K10 (hardware fijo de 7 VMs): Dev y la parte funcional de Staging existen solo durante la ejecución del pipeline, no como servidores que alguien tiene que mantener corriendo.
 
 ### 4.2 Requisitos del ambiente local
 
@@ -253,7 +254,7 @@ VM3 tiene 4 vCPU y 11 GiB de RAM fijos (sección 3.1), compartidos entre el cont
 | Matching Service (Spring Boot) | 1 / 1 vCPU | 1 / 1 GiB | Guaranteed |
 | Identity, Actors, Catalog, ServiceRequest, Ranking, Payments, Communication (NestJS, c/u) | 0.1 / 0.35 vCPU | 256Mi / 512Mi | Burstable |
 
-Con los 7 servicios NestJS en su límite máximo (2.45 vCPU / 3.5 GiB) más el Matching (1 vCPU / 1 GiB) más el overhead de sistema (0.5 vCPU / 2 GiB), el uso máximo teórico es de **3.95 vCPU / 6.5 GiB de 4 vCPU / 11 GiB disponibles** — deja margen para el pod adicional que se crea durante un rolling update y para escalar el Matching a una segunda réplica (AC4-E3) sin agotar la máquina.
+Con los 7 servicios NestJS en su límite máximo (2.45 vCPU / 3.5 GiB) más el Matching (1 vCPU / 1 GiB) más el overhead de sistema (0.5 vCPU / 2 GiB), el uso máximo teórico es de **3.95 vCPU / 6.5 GiB de 4 vCPU / 11 GiB disponibles** — deja margen para el pod adicional que se crea durante un rolling update y para escalar el Matching a una segunda réplica (AC8-E2) sin agotar la máquina.
 
 ```mermaid
 pie title Presupuesto de RAM en VM3 (11 GiB)
@@ -263,7 +264,7 @@ pie title Presupuesto de RAM en VM3 (11 GiB)
     "Margen libre (rolling update / escalado)" : 4.5
 ```
 
-**Por qué el Matching queda en "Guaranteed":** cuando VM3 entra en presión de memoria, Kubernetes desaloja primero los pods en QoS "BestEffort" (sin límites) y luego los "Burstable" que más exceden su *request*; un pod "Guaranteed" (request = limit) es el último candidato a desalojo. AC1-E4 exige que el Matching siga respondiendo bajo pico de carga — dejarlo en la clase de QoS más protegida es lo que hace esa exigencia verificable, no solo declarada.
+**Por qué el Matching queda en "Guaranteed":** cuando VM3 entra en presión de memoria, Kubernetes desaloja primero los pods en QoS "BestEffort" (sin límites) y luego los "Burstable" que más exceden su *request*; un pod "Guaranteed" (request = limit) es el último candidato a desalojo. AC2-E4 exige que el Matching siga respondiendo bajo pico de carga — dejarlo en la clase de QoS más protegida es lo que hace esa exigencia verificable, no solo declarada.
 
 ### 5.7 Límite de conexiones a PostgreSQL
 
@@ -275,7 +276,7 @@ VM4 corre PostgreSQL con `max_connections` por defecto (100). Sin restricción, 
 | Matching (Spring Boot) | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | 10 |
 | Matching (Spring Boot) | `SERVER_TOMCAT_THREADS_MAX` | 50 |
 
-Con esto, el uso base de conexiones queda en ~45 de 100, dejando margen real para escalar el Matching (AC4-E3) sin llegar al error `too many clients`. El límite de hilos de Tomcat (50, en vez del valor por defecto de 200) evita que el servicio abra más hilos de los que su pool de conexiones puede atender, que era la causa del *thrashing* bajo carga identificado en la revisión de capacidad.
+Con esto, el uso base de conexiones queda en ~45 de 100, dejando margen real para escalar el Matching (AC8-E2) sin llegar al error `too many clients`. El límite de hilos de Tomcat (50, en vez del valor por defecto de 200) evita que el servicio abra más hilos de los que su pool de conexiones puede atender, que era la causa del *thrashing* bajo carga identificado en la revisión de capacidad.
 
 ### 5.8 Cómo se despliega o actualiza un microservicio
 
@@ -294,7 +295,7 @@ Con esto, el uso base de conexiones queda en ~45 de 100, dejando margen real par
 
 ### 6.1 Estructura del pipeline
 
-Pipeline en GitHub Actions, separado por aplicación (`web/`, `mobile/`) y por microservicio dentro del backend (`services/identity/`, `services/matching/`, etc.). Un cambio en un solo servicio dispara solo su propio pipeline, no el de los 8 — esto es lo que hace posible cumplir AC5-E1 (build + pruebas en menos de 10 minutos) incluso con pruebas de integración pesadas en el gate de `develop`.
+Pipeline en GitHub Actions, separado por aplicación (`web/`, `mobile/`) y por microservicio dentro del backend (`services/identity/`, `services/matching/`, etc.). Un cambio en un solo servicio dispara solo su propio pipeline, no el de los 8 — esto es lo que hace posible cumplir AC7-E1 (build + pruebas en menos de 10 minutos) incluso con pruebas de integración pesadas en el gate de `develop`.
 
 ### 6.2 Gates por rama
 
@@ -304,7 +305,7 @@ Pipeline en GitHub Actions, separado por aplicación (`web/`, `mobile/`) y por m
 | `develop` | Runner de GitHub Actions | Integración con Testcontainers (PostgreSQL/PostGIS y Kafka reales en Docker) + contrato (Pact) | CI verde |
 | `release/x.y.z` | Runner de GitHub Actions, levantando `docker-compose.staging.yml` | E2E (Playwright, Patrol), UAT contra criterios de aceptación, seguridad (OWASP ZAP) | Checklist de aceptación aprobado — bloquea el merge a `main` si falla (RNF-08) |
 | `main` (despliegue) | Runner self-hosted (VM1) → k3s en VM3 | Rolling update del servicio modificado | Tag SemVer |
-| `main` (post-despliegue) | VM3 real, ventana de mantenimiento programada, inmediatamente después del despliegue | Smoke tests + k6 — 150 matchings concurrentes (AC1-E4), contra tenant de prueba dedicado | Si no cumple el umbral, reversión de imagen (`kubectl rollout undo` — no revierte esquema, ver detalle abajo) antes de habilitar tráfico real |
+| `main` (post-despliegue) | VM3 real, ventana de mantenimiento programada, inmediatamente después del despliegue | Smoke tests + k6 — 150 matchings concurrentes (AC2-E4), contra tenant de prueba dedicado | Si no cumple el umbral, reversión de imagen (`kubectl rollout undo` — no revierte esquema, ver detalle abajo) antes de habilitar tráfico real |
 
 ```mermaid
 flowchart LR
@@ -324,7 +325,7 @@ flowchart LR
 
 El gate de `release/x.y.z` funcional (E2E/UAT/seguridad) corre automáticamente dentro del runner de GitHub Actions: `docker compose -f docker-compose.staging.yml up -d`, se ejecutan las pruebas contra esa copia efímera, y el runner la apaga al terminar. No depende de que un miembro del equipo la tenga levantada en su laptop — eso queda como opción para depurar manualmente, no como el mecanismo del gate. Este es el único gate que bloquea el merge a `main` (RNF-08, parte funcional/seguridad).
 
-La prueba de carga (k6) **no puede correr antes del despliegue** porque no existe una segunda instancia de VM3 donde probar la versión nueva sin desplegarla primero (K5). Por eso corre justo después del rolling update, dentro de la misma ventana de mantenimiento sin usuarios activos (RNF-07): si el reporte no cumple el umbral de AC1-E4, se revierte con `kubectl rollout undo` antes de que haya tráfico real — la reversión es casi instantánea **para la imagen del contenedor**, porque Kubernetes ya conoce la versión anterior y no hay que reconstruir nada.
+La prueba de carga (k6) **no puede correr antes del despliegue** porque no existe una segunda instancia de VM3 donde probar la versión nueva sin desplegarla primero (K10). Por eso corre justo después del rolling update, dentro de la misma ventana de mantenimiento sin usuarios activos (RNF-07): si el reporte no cumple el umbral de AC2-E4, se revierte con `kubectl rollout undo` antes de que haya tráfico real — la reversión es casi instantánea **para la imagen del contenedor**, porque Kubernetes ya conoce la versión anterior y no hay que reconstruir nada.
 
 **Alcance real de esta reversión:** `kubectl rollout undo` no revierte migraciones de esquema de base de datos — solo es "casi instantánea" si el release siguió el patrón expand-contract exigido en la sección 5.8. Si no lo siguió, la recuperación real es restaurar el backup de PostgreSQL (sección 9.3), con el RPO de hasta 24h que eso implica — no un rollback instantáneo. Por eso todo release con migración de esquema debe validar ese patrón antes de llegar a este gate.
 
@@ -376,8 +377,8 @@ flowchart LR
 ### 7.2 Qué cubre esto en el SRS y el SAD
 
 - **RNF-04** (todo 403 queda en log): el 403 se escribe con Pino/el logger del servicio, Promtail lo recolecta, Loki lo guarda permanentemente — sin esta cadena, el log existiría solo mientras el contenedor no se reinicie, lo cual pasa en cada despliegue.
-- **AC6-E1/E2** (reconstruir una disputa, trazabilidad de pagos): requieren historial persistente de eventos — Loki es lo que hace posible que ese historial sobreviva más allá de la vida de un contenedor.
-- **AC3-E1/E3** (disponibilidad, "límite de capacidad a vigilar" de la sección 3.1): Prometheus + `node_exporter` son el instrumento real para vigilar esa capacidad — sin ellos, "vigilar" no tenía con qué hacerse.
+- **AC6-E5/E6** (reconstruir una disputa, trazabilidad de pagos): requieren historial persistente de eventos — Loki es lo que hace posible que ese historial sobreviva más allá de la vida de un contenedor.
+- **AC5-E1/E3 y AC2-E5** (disponibilidad y uso de recursos, "límite de capacidad a vigilar" de la sección 3.1): Prometheus + `node_exporter` son el instrumento real para vigilar esa capacidad — sin ellos, "vigilar" no tenía con qué hacerse.
 
 ---
 
@@ -426,11 +427,11 @@ Ningún secreto (contraseñas, tokens de la pasarela de pagos, credenciales de M
 
 ### 9.3 Recuperación
 
-Restaurar desde el dump más reciente con `pg_restore`. Dado K7 (sin operación 24/7), esta recuperación es **manual**, dentro de la misma ventana de 12–24h ya aceptada para el resto de fallos de infraestructura (ver SAD, sección 5.2) — no hay un mecanismo de restauración automática.
+Restaurar desde el dump más reciente con `pg_restore`. Dado K7 (sin operación 24/7), esta recuperación es **manual**, dentro de la misma ventana de 12–24h ya aceptada para el resto de fallos de infraestructura (ver SAD, escenario AC5-E1 y nota sobre K7 en la sección 1.2) — no hay un mecanismo de restauración automática.
 
 ### 9.4 Evidencias en MinIO — sin respaldo, limitación aceptada
 
-MinIO en VM7 es tanto el almacenamiento principal de las evidencias fotográficas como, si algo le pasa a esa VM, el único lugar donde existían — no hay una octava VM para duplicar el storage (K5), y un respaldo manual dependiente de una sola persona no es un mecanismo confiable ni reproducible por el resto del equipo.
+MinIO en VM7 es tanto el almacenamiento principal de las evidencias fotográficas como, si algo le pasa a esa VM, el único lugar donde existían — no hay una octava VM para duplicar el storage (K10), y un respaldo manual dependiente de una sola persona no es un mecanismo confiable ni reproducible por el resto del equipo.
 
 **Se documenta como limitación aceptada**, con el mismo tratamiento que el SPOF de VM3 (SAD, sección 5.2): si VM7 falla por completo, las evidencias no respaldadas se pierden. El riesgo residual es la pérdida de evidencia fotográfica de servicios ya completados, no la caída de la plataforma — el ciclo de negocio (RF-15, pagos, calificaciones) no depende de que la evidencia siga disponible después de completado el servicio.
 
@@ -442,7 +443,7 @@ MinIO en VM7 es tanto el almacenamiento principal de las evidencias fotográfica
 
 RNF-02 exige que toda comunicación cliente-servidor use HTTPS/TLS. Dado que el sistema no tiene un dominio público (ver sección 11, Dominio y DNS), **no es posible obtener un certificado de Let's Encrypt**: su proceso de validación (retos HTTP-01/DNS-01) exige que el dominio resuelva públicamente hacia el servidor, y las 7 VMs solo son alcanzables dentro de la red privada del laboratorio (`10.43.x.x`).
 
-En su lugar, VM1 (Nginx) sirve HTTPS con un **certificado autofirmado**, generado e instalado desde `setup-base.yml`. Esto satisface RNF-02 literalmente — el tráfico cliente-servidor va cifrado — aunque el navegador del cliente muestre una advertencia de certificado no confiable la primera vez, dado que no proviene de una CA públicamente reconocida. Se documenta como limitación aceptada (sección 13): la norma exige cifrado, no una cadena de confianza pública, y no hay presupuesto (K5) para una CA comercial cuando el acceso ya está restringido a la red del laboratorio.
+En su lugar, VM1 (Nginx) sirve HTTPS con un **certificado autofirmado**, generado e instalado desde `setup-base.yml`. Esto satisface RNF-02 literalmente — el tráfico cliente-servidor va cifrado — aunque el navegador del cliente muestre una advertencia de certificado no confiable la primera vez, dado que no proviene de una CA públicamente reconocida. Se documenta como limitación aceptada (sección 13): la norma exige cifrado, no una cadena de confianza pública, no es posible usar una CA pública sin dominio público (K9), y no hay presupuesto (K5) para una CA comercial cuando el acceso ya está restringido a la red del laboratorio.
 
 El tráfico interno entre VMs, dentro de la misma red privada de la Javeriana, no usa TLS: es tráfico que nunca sale a Internet, y cifrarlo agregaría gestión de certificados internos sin un beneficio real dado que la red ya es privada.
 
@@ -494,7 +495,7 @@ Autenticación únicamente por llave pública — login por contraseña deshabil
 
 ### 11.1 Alcance: sin dominio público
 
-Las 7 VMs del proyecto viven en el rango privado `10.43.x.x` del laboratorio de virtualización de la Javeriana (sección 3), no enrutable desde Internet. No hay NAT, port-forwarding ni un gateway público administrado por el equipo que exponga VM1 hacia afuera de la red del laboratorio — eso está fuera del control del equipo y del alcance de este proyecto académico. En consecuencia, **el proyecto no usa un dominio público real ni un proveedor de DNS público** (Cloudflare, Route 53, GoDaddy, etc.).
+Las 7 VMs del proyecto viven en el rango privado `10.43.x.x` del laboratorio de virtualización de la Javeriana (sección 3), no enrutable desde Internet. No hay NAT, port-forwarding ni un gateway público administrado por el equipo que exponga VM1 hacia afuera de la red del laboratorio — eso está fuera del control del equipo y del alcance de este proyecto académico. Esta es la restricción K9 del SAD (red privada del laboratorio, sin dominio público). En consecuencia, **el proyecto no usa un dominio público real ni un proveedor de DNS público** (Cloudflare, Route 53, GoDaddy, etc.).
 
 ### 11.2 Nombre lógico y resolución interna
 
@@ -558,19 +559,19 @@ El proyecto, dadas sus restricciones académicas (K3, K5), opera con **costo rea
 
 | Limitación | Origen | Detalle en |
 |---|---|---|
-| VM3 es punto único de falla (SPOF) | K5 | SAD, sección 5.2; este documento, sección 5.6 |
+| VM3 es punto único de falla (SPOF) | K10 | SAD, sección 5.2; este documento, sección 5.6 |
 | Las 7 VMs tienen la misma especificación sin importar el rol | Laboratorio de la Javeriana | Sección 3.1 |
-| Sin VM dedicada a staging — funcional en CI, carga contra producción | K5 | Sección 6.2; SRS, RNF-07 |
-| La prueba de carga valida después del despliegue, no antes, con reversión si falla | K5 | Sección 6.2/6.3; SRS, RNF-08 |
+| Sin VM dedicada a staging — funcional en CI, carga contra producción | K10 | Sección 6.2; SRS, RNF-07 |
+| La prueba de carga valida después del despliegue, no antes, con reversión si falla | K10 | Sección 6.2/6.3; SRS, RNF-08 |
 | `kubectl rollout undo` solo revierte la imagen del contenedor, no migraciones de esquema — exige que todo cambio de esquema sea expand-contract | Diseño de Kubernetes | Sección 5.8; sección 6.2 |
-| Evidencias en MinIO sin respaldo | K5 | Sección 9.4 |
-| Recuperación manual entre 12 y 24 horas ante cualquier falla | K7 | SAD, sección 5.2 |
+| Evidencias en MinIO sin respaldo | K5, K10 | Sección 9.4 |
+| Recuperación manual entre 12 y 24 horas ante cualquier falla | K7 | SAD, escenario AC5-E1 y sección 1.2 |
 | QoS "Guaranteed" del Matching protege contra desalojo, pero le quita capacidad de ráfaga | Trade-off de diseño | Sección 5.6 |
 | Parámetros de `readinessProbe`/`livenessProbe` sin definir | Falta de datos reales medidos | Sección 5.8 |
-| La sección 3.1 describe un presupuesto de recursos asignado, no uno medido — la validación real llega con el benchmarking del entregable "PoC + ADR" | K3 (alcance académico) | Sección 3.1 |
-| Certificado TLS autofirmado, sin CA públicamente reconocida, por no existir dominio público | K5 / red privada del laboratorio | Sección 10.1; sección 11 |
+| La sección 5.6 describe un presupuesto de recursos asignado, no uno medido — la validación real llega con el benchmarking del entregable "PoC + ADR" | K3 (alcance académico) | Sección 5.6 |
+| Certificado TLS autofirmado, sin CA públicamente reconocida, por no existir dominio público | K9 | Sección 10.1; sección 11 |
 
-Ninguna de estas limitaciones se considera un defecto a corregir dentro del alcance de este documento — son restricciones aceptadas conscientemente, consistentes con K3, K5 y K7 del SAD.
+Ninguna de estas limitaciones se considera un defecto a corregir dentro del alcance de este documento — son restricciones aceptadas conscientemente, consistentes con los killers K3, K5, K7, K9 y K10 del SAD (sección 1.2).
 
 ---
 
@@ -580,4 +581,5 @@ Ninguna de estas limitaciones se considera un defecto a corregir dentro del alca
 |---|---|---|
 | 1.0 | 13 sep 2026 | Versión inicial del Documento de Infraestructura. |
 | 1.1 | 15 sep 2026 | Se reorganiza el documento para alinearlo con el desglose de Jira (SCRUM-167 a SCRUM-178): se agregan las secciones "Arquitectura de despliegue", "Dominio y DNS" y "Presupuesto"; se promueve "Gestión de secretos" a sección propia; se renumeran las referencias cruzadas internas. Se corrige la sección de TLS: se reemplaza Let's Encrypt (inviable sin dominio público) por certificado autofirmado. |
-| 1.2 | *(este documento)* | Corrige tres hallazgos bloqueantes de una revisión crítica independiente: (1) el `--service-cidr` por defecto de k3s coincidía con la red del laboratorio (`10.43.0.0/16`) — se fija explícitamente fuera de ese rango en `deploy-k3s.yml` (sección 5.2); (2) se documenta que `kubectl rollout undo` no revierte migraciones de esquema y se exige el patrón expand-contract para toda migración (sección 5.8), y se aclara que la prueba de carga corre contra un tenant de prueba dedicado, no contra datos reales (sección 6.2); (3) se completa la tabla de puertos con las rutas que otras secciones ya requerían pero no estaban habilitadas (scrape de `node_exporter`, envío de logs a Loki, API server de k3s para el despliegue, subida del backup a MinIO — sección 10.2). |
+| 1.2 | (sin fecha registrada) | Corrige tres hallazgos bloqueantes de una revisión crítica independiente: (1) el `--service-cidr` por defecto de k3s coincidía con la red del laboratorio (`10.43.0.0/16`) — se fija explícitamente fuera de ese rango en `deploy-k3s.yml` (sección 5.2); (2) se documenta que `kubectl rollout undo` no revierte migraciones de esquema y se exige el patrón expand-contract para toda migración (sección 5.8), y se aclara que la prueba de carga corre contra un tenant de prueba dedicado, no contra datos reales (sección 6.2); (3) se completa la tabla de puertos con las rutas que otras secciones ya requerían pero no estaban habilitadas (scrape de `node_exporter`, envío de logs a Loki, API server de k3s para el despliegue, subida del backup a MinIO — sección 10.2). |
+| 1.3 | 22 sep 2026 | Se alinea con el SAD v2.10: las citas que usaban K5 con el sentido de "sin VMs adicionales" pasan a K10 (hardware fijo de 7 VMs), y el TLS autofirmado y la ausencia de dominio público citan K9 (red privada del laboratorio). Se actualizan los códigos de escenario a la numeración ISO/IEC 25010 del SAD (AC1-E4 → AC2-E4, AC4-E3 → AC8-E2, AC5-E1 → AC7-E1, AC6-E1/E2 → AC6-E5/E6, AC3-E1/E3 → AC5-E1/E3). La ventana de recuperación de 12–24 h cita el escenario AC5-E1 en vez de la sección 5.2 del SAD. Se corrigen referencias internas desactualizadas por la reorganización de la versión 1.1 (presupuesto de recursos en la sección 5.6, benchmarking en la sección 13) y se elimina la referencia a "Vista Física, SDD": la vista física conceptual vive en el SAD y el despliegue operativo en la sección 2 de este documento. |
