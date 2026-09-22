@@ -2,7 +2,7 @@
 
 **Proyecto:** QUICKPATCH - Plataforma multi-tenant de servicios técnicos  
 **Documento:** Descripción de Diseño de Software (SDD)  
-**Estado:** Borrador integrable - Vista Lógica desarrollada  
+**Estado:** Borrador integrable - Vista Lógica y Vista Física desarrolladas  
 **Fecha:** Septiembre de 2026
 
 ---
@@ -488,36 +488,156 @@ Permanecen sujetos a definición de Sprints posteriores:
 
 ---
 
-# 7. Vista Física - pendiente de integración
+# 7. Vista Física
 
 **Corresponde a:** DevOps (Sebastian).
 
-## Recomendación de contenido
+Esta sección presenta cómo se despliega físicamente el sistema descrito en la Vista Lógica: las 7 VMs propias del proyecto, los ambientes de prueba y producción, y el modelo de seguridad de red y gestión de secretos. El detalle operativo completo (inventario de VMs, Ansible, CI/CD paso a paso, healthchecks, orden de arranque, presupuesto de recursos por microservicio y la limitación del clúster k3s de un solo nodo) vive en `Documento de Infraestructura.md` — esta sección consolida la vista física para el SDD sin duplicar ese contenido, siguiendo la misma regla de actualización de la sección 2.
 
-- topología de las 7 VMs;
-- API Gateway / Nginx;
-- Next.js;
-- k3s en VM de backend;
-- PostgreSQL + PostGIS;
-- Redis;
-- Kafka + Kafka UI;
-- MinIO y observabilidad;
-- redes, puertos y reglas de seguridad;
-- ambientes Dev / QA / Prod;
-- contenedores y manifiestos;
-- healthchecks, readiness y liveness;
-- orden de arranque;
-- Ansible;
-- CI/CD y estrategia de despliegue;
-- limitación del clúster k3s de un solo nodo.
+## 7.1 Diagrama de despliegue
 
-## Diagramas recomendados
+```mermaid
+flowchart TB
+    CLIENTE(["Cliente — web / móvil<br/>(red de campus, sin acceso público — K9)"])
 
-- diagrama UML de despliegue;
-- topología de red y VMs;
-- distribución de contenedores por nodo;
-- flujo de entrada desde cliente hasta Gateway y servicios;
-- diagrama de ambientes Dev / QA / Prod.
+    subgraph LAB["Red privada del laboratorio — 10.43.x.x"]
+    direction TB
+
+        subgraph VM1N["VM1 · 10.43.100.168"]
+            VM1["Gateway<br/>Nginx + API Gateway"]
+        end
+        subgraph VM2N["VM2 · 10.43.98.15"]
+            VM2["Frontend Web<br/>Next.js — panel admin"]
+        end
+        subgraph VM3N["VM3 · 10.43.98.205"]
+            VM3["Backend — k3s, nodo único<br/>8 microservicios:<br/>Identity · Actors · Catalog<br/>Matching · ServiceRequest<br/>Ranking · Payments · Communication"]
+        end
+        subgraph VM4N["VM4 · 10.43.98.209"]
+            VM4["Base de datos<br/>PostgreSQL + PostGIS"]
+        end
+        subgraph VM5N["VM5 · 10.43.98.29"]
+            VM5["Cache<br/>Redis"]
+        end
+        subgraph VM6N["VM6 · 10.43.99.12"]
+            VM6["Mensajería<br/>Apache Kafka + Kafka UI"]
+        end
+        subgraph VM7N["VM7 · 10.43.99.8"]
+            VM7["Storage y observabilidad<br/>MinIO · Prometheus · Loki · Grafana"]
+        end
+
+        VM1 -->|"3000"| VM2
+        VM1 -->|"NodePort 30080/30443<br/>Traefik"| VM3
+        VM1 -->|"6443 · API server<br/>runner self-hosted"| VM3
+        VM3 -->|"5432"| VM4
+        VM3 -->|"6379"| VM5
+        VM3 -->|"9092"| VM6
+        VM3 -->|"9000"| VM7
+        VM4 -->|"9000 · backup diario"| VM7
+        VM7 -.->|"9100 · scrape node_exporter"| VM1N
+        VM7 -.->|"9100"| VM2N
+        VM7 -.->|"9100"| VM4N
+        VM7 -.->|"9100"| VM5N
+        VM7 -.->|"9100"| VM6N
+    end
+
+    CLIENTE -->|"443 HTTPS — único punto de entrada"| VM1
+
+    EQUIPO(["Equipo — acceso interno / SSH"])
+    VM6 -.->|"8080 Kafka UI"| EQUIPO
+    VM7 -.->|"3000 Grafana · 9090 Prometheus"| EQUIPO
+
+    style LAB fill:#f4f6fa,stroke:#00468C,stroke-width:1.5px,stroke-dasharray:4 3
+    style VM1N fill:#E1EBFA,stroke:#00468C,stroke-width:1.5px
+    style VM2N fill:#E6F5E6,stroke:#00468C,stroke-width:1.5px
+    style VM3N fill:#FFF0DC,stroke:#00468C,stroke-width:1.5px
+    style VM4N fill:#FAE1E1,stroke:#00468C,stroke-width:1.5px
+    style VM5N fill:#FAE1E1,stroke:#00468C,stroke-width:1.5px
+    style VM6N fill:#F0E6FA,stroke:#00468C,stroke-width:1.5px
+    style VM7N fill:#EBEBEB,stroke:#555555,stroke-width:1.5px
+```
+
+**Figura 5. Diagrama de despliegue de QUICKPATCH sobre las 7 VMs.**
+
+Las 7 VMs son idénticas en hardware (4 vCPU · 11 GiB RAM · 68 GB disco) y solo difieren en el software que alojan (Documento de Infraestructura, sección 3). VM3 es un clúster k3s de un solo nodo: es el punto único de falla reconocido del sistema (SAD, limitación de la sección 5.2). El firewall aplica `default deny incoming`; ninguna VM acepta conexiones directas del exterior salvo VM1 (443) y el acceso SSH del equipo (Documento de Infraestructura, sección 10.2).
+
+## 7.2 Ambientes Dev / QA / Prod
+
+```mermaid
+flowchart TB
+    L["Local<br/>laptop de cada dev<br/>persistente, no compartido"]
+    D["Dev<br/>runner GitHub Actions<br/>Testcontainers — efímero"]
+    Q["QA / Staging<br/>runner GH Actions (funcional, efímero)<br/>+ VM3 real (prueba de carga k6)"]
+    P["Producción<br/>las 7 VMs<br/>persistente, siempre activo"]
+
+    L -->|"push a feature/*"| D
+    D -->|"merge a develop / release"| Q
+    Q -->|"merge a main"| P
+
+    style L fill:#EBEBEB,stroke:#555555,stroke-width:1.5px
+    style D fill:#E1EBFA,stroke:#00468C,stroke-width:1.5px
+    style Q fill:#FFF0DC,stroke:#00468C,stroke-width:1.5px
+    style P fill:#E6F5E6,stroke:#00468C,stroke-width:1.5px
+```
+
+**Figura 6. Ambientes de desarrollo, pruebas y producción.**
+
+Ningún ambiente además de Producción ocupa hardware dedicado (K10: 7 VMs fijas, sin VM adicional para staging) — Dev y la parte funcional de QA existen solo mientras corre el pipeline. La prueba de carga es la única validación que corre contra hardware real (VM3), en ventana de mantenimiento, después del despliegue (Documento de Infraestructura, sección 4 y 6).
+
+## 7.3 Seguridad de red y gestión de secretos
+
+```mermaid
+flowchart TB
+    CLIENTE(["Cliente / red de campus<br/>(sin dominio público — K9)"])
+    EQUIPO(["Equipo — acceso SSH<br/>solo llave pública"])
+
+    subgraph PERIMETRO["VM1 — Perímetro"]
+        direction LR
+        NGINX["Nginx<br/>TLS autofirmado"]
+        RUNNER["Runner self-hosted<br/>GitHub Actions"]
+    end
+
+    subgraph SECRETOS["Gestión de secretos"]
+        direction LR
+        VAULT["Ansible Vault<br/>archivos cifrados en el repo"]
+        GHSECRETS["GitHub Actions Secrets<br/>kubeconfig · token ghcr.io"]
+        K8SSECRET["Kubernetes Secret<br/>dentro de VM3"]
+    end
+
+    subgraph RED["Red privada — 10.43.x.x"]
+        direction LR
+        VM2N["VM2<br/>Next.js"]
+        VM3N["VM3<br/>k3s"]
+        VM4N["VM4<br/>PostgreSQL"]
+        VM5N["VM5<br/>Redis"]
+        VM6N["VM6<br/>Kafka"]
+        VM7N["VM7<br/>MinIO / Obs"]
+    end
+
+    CLIENTE -->|"443 HTTPS"| NGINX
+    NGINX -->|"3000"| VM2N
+    NGINX -->|"NodePort 30080/30443"| VM3N
+
+    VAULT -->|"credenciales al aprovisionar"| VM2N
+    VAULT --> VM4N
+    VAULT --> VM5N
+    VAULT --> VM6N
+    VAULT --> VM7N
+
+    K8SSECRET --> VM3N
+    GHSECRETS -->|"copiado por Ansible"| RUNNER
+    RUNNER -->|"6443 · kubectl set image"| VM3N
+
+    EQUIPO -.->|"22"| PERIMETRO
+    EQUIPO -.->|"22"| RED
+
+    style PERIMETRO fill:#E1EBFA,stroke:#00468C,stroke-width:1.5px
+    style SECRETOS fill:#F0E6FA,stroke:#00468C,stroke-width:1.5px
+    style RED fill:#f4f6fa,stroke:#00468C,stroke-width:1.5px,stroke-dasharray:4 3
+```
+
+**Figura 7. Seguridad de red y gestión de secretos.**
+
+TLS se termina en VM1 con certificado autofirmado — no hay dominio público (K9), por lo que Let's Encrypt no es viable (Documento de Infraestructura, sección 10.1). Los secretos se gestionan por dos mecanismos distintos según el tipo de despliegue: Ansible Vault para las VMs con Docker Compose (VM1, VM2, VM4–VM7) y `Secret` de Kubernetes dentro de VM3; el `kubeconfig` y el token de `ghcr.io` viajan como GitHub Actions Secrets hasta el runner self-hosted en VM1 (Documento de Infraestructura, sección 8).
 
 ---
 
@@ -829,7 +949,7 @@ Antes de consolidar una versión final del SDD se debe verificar:
 | Vista Lógica | Backend | **Desarrollada - lista para revisión** |
 | Vista de Procesos | Backend + QA | Pendiente |
 | Vista de Desarrollo | Backend + Frontend / Miguel | Pendiente |
-| Vista Física | DevOps / Sebastian | Pendiente |
+| Vista Física | DevOps / Sebastian | **Desarrollada - lista para revisión** |
 | Vista de Escenarios (+1) | Angy + equipo | Pendiente |
 | Revisión cruzada | Todo el equipo | Pendiente al completar las vistas |
 
