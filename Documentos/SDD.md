@@ -432,30 +432,203 @@ Permanecen sujetos a definición de Sprints posteriores:
 
 ---
 
-# 5. Vista de Procesos - pendiente de integración
+# 5. Vista de Procesos
 
 **Corresponde a:** Backend Developers + QA.
 
-## Recomendación de contenido
+La Vista de Procesos describe los aspectos dinámicos del sistema: la concurrencia, distribución, flujos de control, comunicación entre procesos y mecanismos de tolerancia a fallos. Esta vista es la base técnica para el diseño de pruebas de integración, resiliencia y rendimiento por parte del equipo de QA.
 
-- procesos y servicios en ejecución;
-- flujos síncronos y asíncronos;
-- secuencia de creación de solicitud y matching;
-- secuencia de pago y facturación;
-- productores y consumidores Kafka;
-- consumer groups;
-- concurrencia del matching;
-- reintentos, backoff y DLQ;
-- idempotencia y Transactional Outbox;
-- manejo de fallos de consumidores y Kafka;
-- escenarios de carga y puntos de sincronización.
+---
 
-## Diagramas recomendados
+## 5.1 Procesos y servicios en ejecución
 
-- diagrama de secuencia: creación de solicitud -> matching -> asignación;
-- diagrama de secuencia: completar servicio -> pago -> factura;
-- diagrama de secuencia: indisponibilidad de Kafka -> Outbox -> reintento;
-- diagrama de actividad para transiciones principales del ciclo de servicio.
+La arquitectura de QUICKPATCH distribuye sus procesos a lo largo de las 7 máquinas virtuales asignadas (aislamiento físico y de red según K5 y K10):
+
+| Proceso / Servicio | Entorno de Ejecución | VM / Host | Rol operativo |
+|---|---|---|---|
+| **App Móvil (Flutter)** | Dispositivos móviles (Android / iOS) | Cliente externo | Interfaz de clientes y técnicos en campo (FA1: requiere conexión activa). |
+| **Panel Web (Next.js)** | Node.js runtime en Docker Compose | VM2 (`10.43.98.15`) | Interfaz administrativa del tenant y operaciones (FA2). |
+| **API Gateway / Reverse Proxy** | Nginx | VM1 (`10.43.100.168`) | Punto único de entrada, enrutamiento, terminación TLS e inspección JWT. |
+| **Microservicios Backend (8)** | Pods independientes en clúster k3s | VM3 (`10.43.98.205`) | Ejecución de la lógica de negocio (Identity, Actors, Catalog, Matching, ServiceRequest, Ranking, Payments, Communication). |
+| **Motor de Base de Datos** | PostgreSQL 15 + PostGIS | VM4 (`10.43.98.209`) | Almacenamiento relacional transaccional y consultas geoespaciales. |
+| **Servicio de Cache y Colas Cortas** | Redis | VM5 (`10.43.98.29`) | Cache en memoria y colas temporales de baja latencia. |
+| **Bus de Eventos (Broker)** | Apache Kafka + Kafka UI | VM6 (`10.43.99.12`) | Mensajería distribuida asíncrona entre microservicios. |
+| **Storage de Evidencias Fotográficas** | MinIO (S3-compatible) | VM7 (`10.43.99.8`) | Repositorio de objetos para evidencias fotográficas de servicios (D7). |
+| **Stack de Observabilidad** | Prometheus + Loki + Grafana | VM7 (`10.43.99.8`) | Agregación de métricas de sistema, recolección de logs estructurados y dashboards. |
+
+---
+
+## 5.2 Flujos síncronos y asíncronos
+
+El sistema aplica una estricta separación de patrones de comunicación (ADR-003, ADR-006):
+
+### 5.2.1 Flujos síncronos (REST over HTTPS)
+Se limitan exclusivamente a las interacciones cliente-servidor a través del API Gateway donde el usuario requiere confirmación o respuesta inmediata:
+- Autenticación e inicio de sesión (`POST /v1/auth/login`, renovación de tokens).
+- Creación de solicitud (`POST /v1/service-requests` — devuelve confirmación con `id` en < 1.5s).
+- Consultas de lectura (`GET /v1/service-requests/{id}`, consulta de perfil `GET /v1/users/me`).
+- Transición de estado de servicio iniciada por técnico (`POST /v1/service-requests/{id}/start`).
+- Carga de evidencia fotográfica (`POST /v1/service-requests/{id}/evidence`).
+- Checkout y confirmación de pago con token del PSP (`POST /v1/service-requests/{id}/payment`).
+
+### 5.2.2 Flujos asíncronos (Event-Driven over Kafka)
+Toda coordinación, cálculo derivado y propagación de estado entre microservicios se realiza de forma asíncrona mediante tópicos de Apache Kafka (ADR-006):
+- Búsqueda y evaluación de técnicos elegibles por el Matching Service tras la creación de una solicitud.
+- Despacho de notificaciones push y alertas al cliente y técnico por el Communication Service.
+- Liberación y actualización del estado del servicio tras la aprobación de pago por el PSP.
+- Emisión de facturas/comprobantes por el Payments Service.
+- Recálculo de reputación promedio de técnicos por el Ranking Service tras una calificación.
+
+---
+
+## 5.3 Secuencia de creación de solicitud y matching
+
+Este flujo describe el ciclo desde la creación de la necesidad por parte del cliente hasta la asignación confirmada del técnico (RF-07, RF-09, RF-10, D1, AC1-E1, AC2-E3):
+
+1. **Recepción:** El cliente envía `POST /v1/service-requests` al API Gateway indicando categoría (`category_id`), descripción, dirección de texto y coordenadas geográficas (`location`).
+2. **Validación e Ingesta:** El Gateway valida el JWT, inyecta `tenant_id` y `user_id` en los headers y enruta a `ServiceRequest Service`.
+3. **Persistencia y Outbox:** `ServiceRequest Service` persiste la solicitud en estado `buscando_tecnico` y, dentro de la misma transacción atómica en PostgreSQL, inserta el evento `service-request.created` en la tabla `outbox_events`. Devuelve respuesta `201 Created` al cliente de inmediato.
+4. **Publicación:** El worker de Outbox lee el registro pendiente y lo publica en el tópico Kafka `service-request.created`.
+5. **Consumo y Búsqueda Geoespacial:** `Matching Service` (Spring Boot) consume el evento. Ejecuta una consulta con PostGIS (`ST_DWithin` / polígonos de `coverage_zones`) contra `technician_availability` con `status = 'disponible'` y filtrando estrictamente por la especialidad (`specialty_id`, AC1-E1).
+6. **Resolución:**
+   - *Caso con candidatos:* Selecciona al técnico óptimo por distancia y ranking. Registra el intento en `matching_attempts` (con marca `expires_at`) y publica `matching.technician-assigned`.
+   - *Caso sin candidatos (Fail Safe, AC9-E4):* Si no hay técnicos que cumplan todos los filtros, el sistema no relaja las reglas; publica `matching.no-technician-available` y la solicitud pasa a estado `en_espera`.
+7. **Notificación y Asignación:** `ServiceRequest Service` actualiza el estado a `asignado`. Simultáneamente, `Communication Service` consume el evento y dispara la notificación push al técnico y al cliente en menos de 7 segundos (AC2-E3).
+8. **Respuesta del Técnico:** El técnico dispone de un tiempo límite para aceptar (`POST /v1/matching/{id}/accept`) o rechazar (`POST /v1/matching/{id}/reject`). Si rechaza o el tiempo expira, el Matching Service inicia la reasignación automática hacia el siguiente candidato disponible (RF-10).
+
+![Diagrama de Secuencia: Creación de Solicitud, Matching y Asignación](assets/sdd/06_secuencia_matching.png)
+
+*Figura 4. Flujo asíncrono de creación de solicitud, matching con PostGIS y notificación.*
+
+---
+
+## 5.4 Secuencia de pago y facturación
+
+Este flujo describe el cierre operativo del servicio y el cobro bajo el estándar PCI-DSS y el modelo Merchant of Record (RF-15, RF-22, RF-24, D4, D7, K2, ADR-009, AC3-E1, AC6-E1, AC9-E1, AC9-E5):
+
+1. **Inicio y Evidencia:** El técnico ejecuta el servicio (`POST /v1/service-requests/{id}/start`, estado `en_progreso`). Antes de completar, sube la foto obligatoria vía `POST /v1/service-requests/{id}/evidence`; el archivo se guarda en MinIO (VM7) y la referencia URL se persiste en `service_evidence` (D7).
+2. **Cierre Técnico:** El técnico solicita completar el servicio (`POST /v1/service-requests/{id}/complete`). `ServiceRequest Service` valida como precondición obligatoria que exista al menos una evidencia en `service_evidence` (AC9-E1). Si se cumple, el estado cambia a `completado` y se publica `service-request.completed`.
+3. **Tokenización de Tarjeta (PCI-DSS):** El cliente ingresa los datos de su tarjeta directamente en el formulario o SDK provisto por la pasarela de pagos (PSP - Wompi). Ni el PAN ni el CVV pasan por el backend propio (K2, ADR-009, AC6-E1). El cliente recibe un token temporal (`provider_token_ref`).
+4. **Solicitud de Cobro:** El cliente confirma el pago en la app enviando `POST /v1/service-requests/{id}/payment` con el token.
+5. **Procesamiento de Pago:** `Payments Service` crea el registro en `payments` (estado `pendiente`) y llama a la API del PSP para procesar la transacción.
+6. **Resolución del Cobro:**
+   - *Aprobado:* Actualiza `payments.status = 'aprobado'`, genera el comprobante en `invoices` a nombre de la plataforma (Merchant of Record, D4) con número único de factura, y publica `payment.approved` vía Transactional Outbox.
+   - *Rechazado o Fallo del PSP (AC9-E5):* Actualiza a `rechazado`, publica `payment.rejected` y la solicitud no pasa a pagada, evitando cobros dobles y permitiendo reintento seguro.
+7. **Cierre de Ciclo:** `ServiceRequest Service` consume `payment.approved` y actualiza el estado a `pagado`. `Communication Service` notifica la aprobación y envía el enlace de descarga de la factura.
+8. **Calificación:** El cliente califica el servicio (`POST /v1/service-requests/{id}/rating`, 1 a 5 estrellas). Se almacena en `ratings` y se emite el evento para que `Ranking Service` actualice la reputación agregada del técnico.
+
+![Diagrama de Secuencia: Completar Servicio, Evidencia y Pago](assets/sdd/07_secuencia_pagos.png)
+
+*Figura 5. Flujo de finalización de servicio, tokenización PCI-DSS y facturación.*
+
+---
+
+## 5.5 Productores y consumidores Kafka
+
+La matriz de eventos asíncronos formalizada en el sistema (según DD, sección 7.2) es la siguiente:
+
+| Tópico / Evento | Microservicio Productor | Microservicios Consumidores | Propósito del Flujo |
+|---|---|---|---|
+| `service-request.created` | `ServiceRequest Service` | `Matching Service`, `Communication Service` | Iniciar búsqueda de técnico disponible y notificar al cliente que su solicitud fue recibida. |
+| `matching.technician-assigned` | `Matching Service` | `ServiceRequest Service`, `Communication Service` | Actualizar estado a `asignado` y notificar al técnico candidato y al cliente. |
+| `matching.no-technician-available` | `Matching Service` | `ServiceRequest Service`, `Communication Service` | Colocar solicitud en `en_espera` y notificar al cliente que no hay técnicos disponibles (AC9-E4). |
+| `service-request.completed` | `ServiceRequest Service` | `Payments Service`, `Communication Service` | Habilitar el proceso de pago y notificar al cliente que el servicio finalizó. |
+| `payment.approved` | `Payments Service` | `ServiceRequest Service`, `Communication Service` | Cambiar estado de solicitud a `pagado` y enviar comprobante/factura al cliente. |
+| `payment.rejected` | `Payments Service` | `ServiceRequest Service`, `Communication Service` | Informar rechazo de cobro y habilitar reintento de pago. |
+| `service-request.evaluated` | `ServiceRequest Service` | `Ranking Service` | Disparar el recálculo asíncrono de la reputación promedio del técnico. |
+
+---
+
+## 5.6 Consumer Groups
+
+Para garantizar escalabilidad horizontal y procesamiento desacoplado en Kafka (ADR-003, AC5-E3):
+
+1. **Grupos asignados por microservicio:**
+   - `servicerequest-service-group`
+   - `matching-service-group`
+   - `payments-service-group`
+   - `communication-service-group`
+   - `ranking-service-group`
+2. **Aislamiento de offsets:** Cada consumer group almacena su progreso de lectura de forma independiente en Kafka. Si un servicio se detiene por mantenimiento o falla (ej. `ranking-service`, escenario AC5-E3), los eventos continúan encolándose en el tópico sin bloquear a los otros grupos; al reiniciar el pod, retoma el procesamiento desde el último offset confirmado sin pérdida de datos.
+3. **Estrategia de particionado:** Los mensajes utilizan como clave (*message key*) el `aggregate_id` (o `service_request_id`). Esto asegura que todos los eventos relacionados con una misma solicitud lleguen a la misma partición y sean consumidos en estricto orden cronológico.
+
+---
+
+## 5.7 Concurrencia del matching
+
+El motor de matching debe gestionar la asignación concurrente para evitar que múltiples solicitudes en la misma zona reserven o asignen simultáneamente al mismo técnico (condición de carrera):
+
+1. **Bloqueo lógico y reserva temporal:** Al seleccionar un técnico candidato, el `Matching Service` registra el intento en `matching_attempts` con una marca temporal `expires_at` y actualiza temporalmente `technician_availability.status = 'ofrecido'`.
+2. **Expiración y liberación:** Si el técnico no responde dentro de la ventana de expiración, el intento se marca como expirado, la disponibilidad se libera nuevamente y el motor evalúa al siguiente técnico más cercano.
+3. **Pico de carga y degradación controlada (AC2-E4):** El motor soporta hasta 150 solicitudes de matching concurrentes (3x la carga pico esperada). Ante saturación, los eventos permanecen en el buffer de Kafka y se procesan por turnos sin emitir errores HTTP 5xx ni tumbar el servicio.
+
+---
+
+## 5.8 Reintentos, backoff y Dead Letter Queue (DLQ)
+
+La estrategia de tolerancia a fallos en el consumo de eventos distingue entre errores transitorios y permanentes:
+
+1. **Errores transitorios (red, bloqueo temporal de BD):**
+   - Se aplican hasta **3 reintentos automáticos** con **backoff exponencial** (1s, 2s, 5s) con variación aleatoria (*jitter*) para evitar tormentas de reintentos.
+2. **Errores permanentes o mensajes venenosos (*poison pills*):**
+   - Si un evento no puede deserializarse o falla tras agotar los 3 reintentos, el consumidor desvía el mensaje al tópico de Dead Letter Queue correspondiente (ej. `service-request.created.DLQ`).
+   - El consumidor registra un log estructurado de nivel `ERROR` en Loki con el `eventId`, `correlationId` y causa del error (AC7-E4), avanzando el offset para no bloquear el flujo de las demás solicitudes.
+
+---
+
+## 5.9 Idempotencia y Transactional Outbox
+
+Dado que la comunicación por Kafka garantiza entrega *at-least-once* (al menos una vez), el sistema implementa defensas para asegurar consistencia e idempotencia (ADR-007, AC5-E4, AC5-E5):
+
+### 5.9.1 Publicación confiable: Transactional Outbox
+Para evitar el problema de la escritura dual (guardar en base de datos pero fallar al publicar en Kafka):
+1. La escritura del cambio de estado y el registro del evento en la tabla `outbox_events` ocurren dentro de la **misma transacción local ACID** en PostgreSQL:
+   ```sql
+   BEGIN;
+   INSERT INTO service_requests (...) VALUES (...);
+   INSERT INTO outbox_events (aggregate_id, event_type, payload, attempts) VALUES (...);
+   COMMIT;
+   ```
+2. Un proceso en segundo plano (*Outbox Worker*) consulta registros con `published_at IS NULL`, los publica en Kafka y marca `published_at = NOW()`.
+3. Si Kafka no está disponible, la operación de negocio no se cae; el worker reintenta periódicamente hasta que Kafka se restablece (0 eventos perdidos, AC5-E4).
+
+### 5.9.2 Consumo idempotente (Deduplicación)
+Para evitar efectos secundarios duplicados (ej. doble cobro o doble notificación, escenario AC5-E5):
+1. Cada evento transporta un identificador único global `eventId`.
+2. El consumidor registra los `eventId` procesados en almacenamiento local o verifica si el estado actual de la entidad ya superó la transición del evento.
+3. Si el `eventId` ya fue aplicado, el consumidor descarta el procesamiento repetido y confirma el offset inmediatamente.
+
+![Diagrama de Secuencia: Indisponibilidad de Kafka y Outbox](assets/sdd/08_resiliencia_outbox.png)
+
+*Figura 6. Tolerancia a fallos con Transactional Outbox ante indisponibilidad del broker.*
+
+---
+
+## 5.10 Manejo de fallos de consumidores y Kafka
+
+El sistema define protocolos de contingencia ante fallos en los componentes de ejecución (AC5-E1, AC5-E3, AC5-E4):
+
+| Escenario de Falla | Comportamiento del Sistema | Recuperación |
+|---|---|---|
+| **Caída del broker Kafka (VM6)** | Las operaciones síncronas (REST en VM1) siguen funcionando. Los eventos salientes se almacenan en `outbox_events` en PostgreSQL (VM4). | Al volver Kafka, el Outbox Worker drena el backlog pendiente automáticamente sin pérdida de información (AC5-E4). |
+| **Caída de un Pod en k3s (VM3)** | Los demás 7 microservicios continúan operando normalmente. Los eventos dirigidos al servicio caído se acumulan en Kafka. | Kubernetes detecta la falla mediante `livenessProbe` y reinicia el pod automáticamente. El pod reanuda la lectura desde su último offset confirmado (AC5-E3). |
+| **Fallo en Base de Datos (VM4)** | Los pods detectan pérdida de conexión en su `readinessProbe` y se marcan como no disponibles. | Nginx en VM1 devuelve error controlado `503 Service Unavailable` sin corromper transacciones a medias. |
+
+---
+
+## 5.11 Escenarios de carga y puntos de sincronización
+
+Esta sección establece los umbrales de sincronización y rendimiento operativo que deben verificarse en las pruebas de carga y QA:
+
+### 5.11.1 Puntos de sincronización críticos
+- **Latencia REST (Ingesta):** Respuesta de creación de solicitud (`POST /v1/service-requests`) en menos de 1.5 segundos.
+- **Ventana de Matching Asíncrono:** Desde la creación de la solicitud hasta la notificación al técnico candidato en **menos de 7 segundos** en operación normal (AC2-E3).
+- **Reflejo de Estado en Cliente:** Notificación y actualización de estado en la app móvil en **menos de 60 segundos** (RNF-06).
+- **Procesamiento de Pago:** Confirmación del cobro y emisión de comprobante en menos de 3 segundos con la pasarela externa (AC3-E1).
+
+### 5.11.2 Presupuesto y dimensionamiento bajo carga
+- **Carga Pico Soportada:** Hasta 150 solicitudes de matching concurrentes (AC2-E4) sin caídas del servicio.
+- **Consumo de Recursos en VM3:** Consumo máximo de memoria de los 8 microservicios acotado a ≤ 6.5 GiB de RAM sobre los 11 GiB disponibles, con **0 reinicios por OOMKilled** bajo operación sostenida de 50 solicitudes concurrentes (AC2-E5, ver presupuesto en Documento de Infraestructura, sección 5.6).
 
 ---
 
