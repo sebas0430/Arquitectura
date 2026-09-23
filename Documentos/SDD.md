@@ -50,7 +50,7 @@ La arquitectura lógica del backend se organiza por dominios y servicios. Los cl
 
 ### 3.1.1 Vista lógica general por capas
 
-![Vista lógica general por capas](sdd_v2_assets/01_vista_logica_capas.png)
+![Vista lógica general por capas](assets/sdd/01_vista_logica_capas.png)
 
 **Figura 1. Vista lógica general por capas de QUICKPATCH.**
 
@@ -58,7 +58,7 @@ La representación organiza el sistema en capa de cliente, entrada/presentación
 
 ### 3.1.2 Componentes lógicos principales del backend
 
-![Diagrama de componentes del backend](sdd_v2_assets/02_componentes_backend.png)
+![Diagrama de componentes del backend](assets/sdd/02_componentes_backend.png)
 
 **Figura 2. Componentes lógicos principales del backend.**
 
@@ -282,7 +282,7 @@ Chat y reclamaciones permanecen como funcionalidades futuras hasta que sean inco
 
 ## 3.3 Modelo lógico de dominio y relaciones
 
-![Modelo lógico de dominio](sdd_v2_assets/03_modelo_logico_dominio.png)
+![Modelo lógico de dominio](assets/sdd/03_modelo_logico_dominio.png)
 
 **Figura 3. Modelo lógico de dominio y referencias entre servicios.**
 
@@ -360,7 +360,7 @@ payment.rejected
 
 ## 4.1 Estructura interna de los microservicios backend
 
-![Capas internas de un microservicio](sdd_v2_assets/04_capas_microservicio.png)
+![Capas internas de un microservicio](assets/sdd/04_capas_microservicio.png)
 
 **Figura 4. Estructura lógica interna de un microservicio.**
 
