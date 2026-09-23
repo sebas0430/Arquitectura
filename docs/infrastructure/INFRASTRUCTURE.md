@@ -54,7 +54,7 @@ flowchart TB
         GW["API Gateway"]
     end
     subgraph VM2["VM2 — Frontend web"]
-        WEB["Next.js (panel admin)"]
+        WEB["Angular (panel administrativo)"]
     end
     subgraph VM3["VM3 — Backend (k3s, nodo único)"]
         MS["8 microservicios:<br/>Identity, Actors, Catalog, Matching,<br/>ServiceRequest, Ranking, Payments, Communication"]
@@ -116,7 +116,7 @@ Las 7 VMs son asignadas por el laboratorio de virtualización de la Pontificia U
 | VM | Rol | IP | Software instalado |
 |---|---|---|---|
 | VM1 | Gateway | `10.43.100.168` | Nginx + API Gateway |
-| VM2 | Frontend web | `10.43.98.15` | Next.js (panel admin) |
+| VM2 | Frontend web | `10.43.98.15` | Angular (panel administrativo) |
 | VM3 | Backend | `10.43.98.205` | k3s (nodo único) — 8 microservicios: Identity, Actors, Catalog, Matching, ServiceRequest, Ranking, Payments, Communication |
 | VM4 | Base de datos | `10.43.98.209` | PostgreSQL + PostGIS |
 | VM5 | Cache | `10.43.98.29` | Redis |
@@ -140,7 +140,7 @@ Ningún ambiente además de Producción ocupa hardware dedicado y permanente —
 
 ### 4.2 Requisitos del ambiente local
 
-_Pendiente de confirmar con Backend y Frontend: versión de Node.js, versión del SDK de Flutter, gestor de paquetes y forma de fijar la versión en el repo (`.nvmrc` u otro). Se completa cuando el equipo lo confirme._
+_Pendiente de fijar con el equipo: versión de .NET SDK, JDK/Spring Boot, Node.js/Angular CLI y Flutter SDK. Cada toolchain deberá quedar fijado en el repositorio mediante archivos/configuración reproducible. Se completa cuando el equipo lo confirme._
 
 ---
 
@@ -184,14 +184,14 @@ vm7 ansible_host=10.43.99.8
 | `deploy-cache.yml` | VM5 | Redis vía Docker Compose |
 | `deploy-gateway.yml` | VM1 | Nginx + configuración del API Gateway |
 | `deploy-runner.yml` | VM1 | Registro e instalación del runner self-hosted de GitHub Actions (servicio systemd), copia del `kubeconfig` de VM3 |
-| `deploy-frontend.yml` | VM2 | Contenedor de Next.js vía Docker Compose |
+| `deploy-frontend.yml` | VM2 | build Angular servido por Nginx en Docker Compose |
 | `deploy-storage-observability.yml` | VM7 | MinIO + Prometheus + Loki + Grafana vía Docker Compose (los componentes centrales; `node_exporter`/Promtail van en `setup-base.yml`, no aquí) |
 
 `setup-base.yml` corre primero y en las 7 VMs por igual; los ocho restantes son específicos de cada rol y en general solo tocan su propia VM (vía los grupos del inventario), de forma que aplicar o repetir uno no afecta a las demás — la única excepción es `deploy-runner.yml`, que además copia el `kubeconfig` generado por `deploy-k3s.yml` (sección 5.4).
 
 > **Nota crítica sobre el rango de red de k3s:** el `--service-cidr` por defecto de k3s es `10.43.0.0/16` — exactamente el rango en el que viven las 7 VMs del laboratorio (`10.43.98.x`, `10.43.99.x`, `10.43.100.x`). Sin cambiarlo, un `ClusterIP` que k3s asigne a un `Service` puede coincidir con la IP real de otra VM (por ejemplo, `10.43.98.209`, la IP de VM4): el tráfico de un pod hacia esa IP se enrutaría al Service en vez de a PostgreSQL, un fallo intermitente y dependiente del orden de asignación de IPs, no reproducible de forma confiable. Por eso `deploy-k3s.yml` instala k3s con `--service-cidr` y `--cluster-cidr` fijados fuera de `10.43.0.0/16` (ver tabla arriba) — este flag se fija en el momento de instalación y no se puede cambiar después sin reinstalar el clúster.
 
-> **Nota sobre Pino:** Pino no se instala en ningún lado — es la librería de logging que cada microservicio NestJS usa internamente para escribir sus logs en formato JSON a la salida estándar del contenedor. **Loki** (en VM7) es el componente real que los agrega y almacena; **Promtail** (instalado en las 7 VMs desde `setup-base.yml`) es el agente que los recolecta desde cada contenedor y se los envía a Loki. Grafana consulta Loki igual que consulta Prometheus, en la misma interfaz. El detalle de este flujo se documenta en la sección 7 (Monitoreo y observabilidad).
+> **Nota sobre logging de aplicación:** los siete servicios ASP.NET Core deben emitir logging estructurado mediante las abstracciones estándar de `Microsoft.Extensions.Logging` (con un proveedor estructurado como Serilog si el equipo lo adopta); Matching utiliza logging estructurado del ecosistema Spring/SLF4J. Los logs se escriben a la salida estándar de los contenedores. Promtail los recolecta y Loki los almacena en VM7; Grafana consulta Loki junto con Prometheus. La elección del proveedor de logging no cambia el contrato operativo: salida estructurada, correlation ID y ausencia de secretos/PAN/CVV.
 
 ### 5.3 Bootstrap inicial de los microservicios
 
@@ -246,21 +246,21 @@ Solo VM3 usa Kubernetes (k3s); el resto de VMs usa Docker Compose, consistente c
 
 ### 5.6 Presupuesto de recursos en VM3
 
-VM3 tiene 4 vCPU y 11 GiB de RAM fijos (sección 3.1), compartidos entre el control plane de k3s y los 8 microservicios. Sin límites explícitos, Node/V8 y el JVM asumen que tienen toda la máquina disponible, lo que puede llevar a que el sistema operativo mate procesos por falta de memoria durante un pico de carga — y que la primera víctima sea, por cómo Kubernetes decide a quién desalojar, el propio Matching Service. Para evitarlo, cada microservicio declara `resources.requests` y `resources.limits` explícitos:
+VM3 tiene 4 vCPU y 11 GiB de RAM fijos (sección 3.1), compartidos entre el control plane de k3s y los 8 microservicios. Sin límites explícitos, .NET runtime/GC y el JVM asumen que tienen toda la máquina disponible, lo que puede llevar a que el sistema operativo mate procesos por falta de memoria durante un pico de carga — y que la primera víctima sea, por cómo Kubernetes decide a quién desalojar, el propio Matching Service. Para evitarlo, cada microservicio declara `resources.requests` y `resources.limits` explícitos:
 
 | Componente | CPU (request/limit) | RAM (request/limit) | Clase de QoS |
 |---|---|---|---|
 | k3s + containerd + Traefik + CoreDNS (sistema) | — | — | reservado, ~0.5 vCPU / ~2 GiB de margen |
 | Matching Service (Spring Boot) | 1 / 1 vCPU | 1 / 1 GiB | Guaranteed |
-| Identity, Actors, Catalog, ServiceRequest, Ranking, Payments, Communication (NestJS, c/u) | 0.1 / 0.35 vCPU | 256Mi / 512Mi | Burstable |
+| Identity, Actors, Catalog, ServiceRequest, Ranking, Payments, Communication (ASP.NET Core, c/u) | Pendiente de medición | Pendiente de medición | Burstable inicialmente |
 
-Con los 7 servicios NestJS en su límite máximo (2.45 vCPU / 3.5 GiB) más el Matching (1 vCPU / 1 GiB) más el overhead de sistema (0.5 vCPU / 2 GiB), el uso máximo teórico es de **3.95 vCPU / 6.5 GiB de 4 vCPU / 11 GiB disponibles** — deja margen para el pod adicional que se crea durante un rolling update y para escalar el Matching a una segunda réplica (AC8-E2) sin agotar la máquina.
+Los límites históricos calculados para NestJS no se reutilizan automáticamente para ASP.NET Core. El presupuesto total de VM3 continúa sujeto a los atributos de calidad vigentes, pero `requests` y `limits` por servicio se fijarán con mediciones de los contenedores .NET y Java. Antes de producción se debe demostrar que el conjunto de los 8 microservicios, k3s y el margen requerido para rolling updates cabe dentro de los 4 vCPU y 11 GiB disponibles sin `OOMKilled`.
 
 ```mermaid
 pie title Presupuesto de RAM en VM3 (11 GiB)
     "Sistema (k3s, containerd, Traefik, CoreDNS)" : 2
     "Matching Service (Guaranteed)" : 1
-    "7 servicios NestJS (límite máximo)" : 3.5
+    "7 servicios ASP.NET Core (límite máximo)" : 3.5
     "Margen libre (rolling update / escalado)" : 4.5
 ```
 
@@ -268,15 +268,7 @@ pie title Presupuesto de RAM en VM3 (11 GiB)
 
 ### 5.7 Límite de conexiones a PostgreSQL
 
-VM4 corre PostgreSQL con `max_connections` por defecto (100). Sin restricción, cada instancia de un servicio NestJS con Prisma abre por defecto varias conexiones simultáneas, y sumadas a las del Matching (HikariCP) pueden acercarse al límite incluso sin haber escalado ningún servicio. Se fija explícitamente, vía variable de entorno en cada `deployment.yaml` (sin tocar el código de los servicios):
-
-| Servicio | Variable | Valor |
-|---|---|---|
-| Los 7 servicios NestJS | `DATABASE_URL=...?connection_limit=5` | 5 conexiones c/u → 35 en total |
-| Matching (Spring Boot) | `SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | 10 |
-| Matching (Spring Boot) | `SERVER_TOMCAT_THREADS_MAX` | 50 |
-
-Con esto, el uso base de conexiones queda en ~45 de 100, dejando margen real para escalar el Matching (AC8-E2) sin llegar al error `too many clients`. El límite de hilos de Tomcat (50, en vez del valor por defecto de 200) evita que el servicio abra más hilos de los que su pool de conexiones puede atender, que era la causa del *thrashing* bajo carga identificado en la revisión de capacidad.
+VM4 mantiene PostgreSQL como almacén común de infraestructura con ownership lógico por servicio. Los siete servicios ASP.NET Core utilizan EF Core + Npgsql, cuyo pool de conexiones debe configurarse explícitamente; Matching utiliza el pool HikariCP de Spring. Los tamaños definitivos de ambos pools se establecerán mediante pruebas de integración/carga y deberán mantener margen sobre `max_connections`, incluyendo escenarios de rolling update y escalado del Matching. No se conserva como supuesto el cálculo previo basado en Prisma porque corresponde al stack descartado.
 
 ### 5.8 Cómo se despliega o actualiza un microservicio
 
@@ -285,7 +277,7 @@ Con esto, el uso base de conexiones queda en ~45 de 100, dejando margen real par
 3. Kubernetes aplica un *rolling update*: crea el pod nuevo, espera a que pase el `readinessProbe`, y solo entonces retira el pod anterior — sin downtime para ese servicio ni para los demás 7.
 4. El margen de RAM definido en la sección 5.6 es lo que permite que el pod adicional del rolling update quepa sin desalojar a otros servicios.
 
-**Migraciones de base de datos — por qué deben ser *expand-contract*:** `kubectl rollout undo` (sección 6.2) revierte únicamente la imagen del contenedor a la versión anterior; **nunca revierte una migración de esquema** (Prisma/Flyway). Si un release incluye una migración que rompe compatibilidad hacia atrás (por ejemplo, elimina o renombra una columna que la versión anterior todavía usa), un rollback de imagen deja código viejo corriendo contra un esquema nuevo — el sistema queda roto, no recuperado. Por eso toda migración de esquema debe seguir el patrón **expand-contract**: agregar lo nuevo (columna, tabla) sin tocar ni eliminar lo que la versión anterior todavía necesita; solo se retira lo viejo en un release posterior, una vez que ningún código en producción depende de ello. Bajo esta regla, un `kubectl rollout undo` sí es seguro: la versión anterior del código sigue siendo compatible con el esquema, ya ampliado, de la base de datos. Si una migración no puede expresarse de forma expand-contract dentro del alcance de un sprint, no se despliega junto con el resto del release — se separa en su propio cambio, con downtime planeado y comunicado (escenario de mantenimiento planeado del SAD).
+**Migraciones de base de datos — por qué deben ser *expand-contract*:** `kubectl rollout undo` (sección 6.2) revierte únicamente la imagen del contenedor a la versión anterior; **nunca revierte una migración de esquema** (EF Core/Flyway). Si un release incluye una migración que rompe compatibilidad hacia atrás (por ejemplo, elimina o renombra una columna que la versión anterior todavía usa), un rollback de imagen deja código viejo corriendo contra un esquema nuevo — el sistema queda roto, no recuperado. Por eso toda migración de esquema debe seguir el patrón **expand-contract**: agregar lo nuevo (columna, tabla) sin tocar ni eliminar lo que la versión anterior todavía necesita; solo se retira lo viejo en un release posterior, una vez que ningún código en producción depende de ello. Bajo esta regla, un `kubectl rollout undo` sí es seguro: la versión anterior del código sigue siendo compatible con el esquema, ya ampliado, de la base de datos. Si una migración no puede expresarse de forma expand-contract dentro del alcance de un sprint, no se despliega junto con el resto del release — se separa en su propio cambio, con downtime planeado y comunicado (escenario de mantenimiento planeado del SAD).
 
 **Pendiente de definir con datos reales:** los parámetros de `readinessProbe`/`livenessProbe` (tiempos de espera, número de reintentos) y si se necesita un `startupProbe` separado para el arranque. No se fijan valores en esta versión del documento porque dependen del comportamiento real de cada servicio bajo carga, algo que todavía no se ha medido — fijar un número ahora sería una estimación sin sustento, el mismo problema señalado en la sección 3.1.
 
@@ -301,7 +293,7 @@ Pipeline en GitHub Actions, separado por aplicación (`web/`, `mobile/`) y por m
 
 | Rama | Dónde corre | Qué corre | Gate |
 |---|---|---|---|
-| `feature/*` → PR a `develop` | Runner de GitHub Actions | Lint + unitarias (Jest, `flutter_test`) del servicio afectado | CI verde + 1 revisor, sin autoaprobación |
+| `feature/*` → PR a `develop` | Runner de GitHub Actions | Lint + unitarias del componente afectado (`dotnet test`, pruebas Maven/Gradle de Matching, `ng test` o `flutter test` según corresponda) | CI verde + 1 revisor, sin autoaprobación |
 | `develop` | Runner de GitHub Actions | Integración con Testcontainers (PostgreSQL/PostGIS y Kafka reales en Docker) + contrato (Pact) | CI verde |
 | `release/x.y.z` | Runner de GitHub Actions, levantando `docker-compose.staging.yml` | E2E (Playwright, Patrol), UAT contra criterios de aceptación, seguridad (OWASP ZAP) | Checklist de aceptación aprobado — bloquea el merge a `main` si falla (RNF-08) |
 | `main` (despliegue) | Runner self-hosted (VM1) → k3s en VM3 | Rolling update del servicio modificado | Tag SemVer |
@@ -376,7 +368,7 @@ flowchart LR
 
 ### 7.2 Qué cubre esto en el SRS y el SAD
 
-- **RNF-04** (todo 403 queda en log): el 403 se escribe con Pino/el logger del servicio, Promtail lo recolecta, Loki lo guarda permanentemente — sin esta cadena, el log existiría solo mientras el contenedor no se reinicie, lo cual pasa en cada despliegue.
+- **RNF-04** (todo 403 queda en log): el 403 se escribe con el logger estructurado del servicio ASP.NET Core o Spring Boot, Promtail lo recolecta, Loki lo guarda permanentemente — sin esta cadena, el log existiría solo mientras el contenedor no se reinicie, lo cual pasa en cada despliegue.
 - **AC6-E5/E6** (reconstruir una disputa, trazabilidad de pagos): requieren historial persistente de eventos — Loki es lo que hace posible que ese historial sobreviva más allá de la vida de un contenedor.
 - **AC5-E1/E3 y AC2-E5** (disponibilidad y uso de recursos, "límite de capacidad a vigilar" de la sección 3.1): Prometheus + `node_exporter` son el instrumento real para vigilar esa capacidad — sin ellos, "vigilar" no tenía con qué hacerse.
 
@@ -452,7 +444,7 @@ El tráfico interno entre VMs, dentro de la misma red privada de la Javeriana, n
 ```mermaid
 flowchart TB
     INET(["Internet / red de campus"]) -->|"443 HTTPS"| VM1
-    VM1["VM1 — Gateway<br/>Nginx + API Gateway"] -->|"3000"| VM2["VM2 — Next.js"]
+    VM1["VM1 — Gateway<br/>Nginx + API Gateway"] -->|"3000"| VM2["VM2 — Angular Admin"]
     VM1 -->|"NodePort 30080/30443<br/>Traefik (k3s)"| VM3["VM3 — k3s<br/>8 microservicios"]
     VM1 -->|"6443 — API server<br/>(runner self-hosted, sección 6.3)"| VM3
     VM3 -->|"5432"| VM4["VM4 — PostgreSQL + PostGIS"]
@@ -469,7 +461,7 @@ flowchart TB
 | Origen | Destino | Puerto | Servicio |
 |---|---|---|---|
 | Internet / red de campus | VM1 | 443 | Nginx / API Gateway (TLS) |
-| VM1 | VM2 | 3000 | Next.js |
+| VM1 | VM2 | 3000 | Angular Admin (Nginx) |
 | VM1 | VM3 | 30080 / 30443 | Ingreso a microservicios (Traefik, NodePort de k3s) |
 | VM1 | VM3 | 6443 | API server de k3s — usado por `kubectl` desde el runner self-hosted (sección 6.3) para desplegar |
 | VM3 | VM4 | 5432 | PostgreSQL |

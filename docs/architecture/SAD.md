@@ -251,7 +251,7 @@ Característica agregada en esta versión (ver sección 2). Cubre si el sistema 
 |Fuente|Cualquier usuario autenticado (Cliente, Técnico, Admin)|
 |Estímulo|Accede a la plataforma desde un dispositivo móvil o de escritorio|
 |Ambiente|Operación normal|
-|Artefacto|Interfaces Next.js (panel admin) y Flutter (app móvil)|
+|Artefacto|Interfaces Angular (panel admin) y Flutter (app móvil)|
 |Respuesta|La interfaz se adapta al tamaño de pantalla sin pérdida de funcionalidad|
 |Medida|100% de las pantallas son utilizables sin scroll horizontal ni elementos cortados en los tamaños soportados (RNF-12)|
 
@@ -547,7 +547,7 @@ Característica agregada en esta versión (ver sección 2). Cubre si el sistema 
 |Ambiente|Desarrollo|
 |Artefacto|Módulos transversales compartidos|
 |Respuesta|Los reutiliza en vez de reimplementarlos|
-|Medida|0 copias de esa lógica entre servicios: una sola implementación por stack (NestJS y Spring Boot), verificable en revisión de PR|
+|Medida|0 copias de esa lógica entre servicios: una sola implementación por stack (ASP.NET Core y Spring Boot), verificable en revisión de PR|
 
 ### 3.8 AC8 — Flexibility
 
@@ -804,7 +804,7 @@ flowchart TB
 
     subgraph Frontend["Clientes"]
         direction LR
-        WEB["Next.js (Web)<br/>Panel Admin"]
+        WEB["Angular (Web)<br/>Panel Admin"]
         MOBILE["Flutter<br/>(iOS/Android)"]
     end
 
@@ -842,7 +842,7 @@ flowchart TB
 
 #### 4.2.1 Clientes (frontend)
 
-- **Next.js (Web)**: panel administrativo del tenant — gestión de empleados, aliados, proveedores y reportes. Exclusivamente backoffice, sin sitio público indexable (ver FA2).
+- **Angular (Web)**: panel administrativo del tenant — gestión de empleados, aliados, proveedores y reportes. Exclusivamente backoffice, sin sitio público indexable (ver FA2).
 - **Flutter (iOS/Android)**: aplicación para clientes y para técnicos/aliados en campo.
 
 Ambos clientes se comunican con el sistema a través de un **API Gateway** único, que enruta cada solicitud al microservicio correspondiente y resuelve autenticación y rate limiting de forma centralizada.
@@ -891,11 +891,11 @@ Esta sección describe cómo se distribuye el sistema sobre las 7 VMs propias (K
 
 |VM|IP|Rol|Qué corre|
 |---|---|---|---|
-|VM1|10.43.100.168|Gateway / Entry point|Nginx + API Gateway — enruta tráfico a Next.js y a los 8 microservicios en VM3|
-|VM2|10.43.98.15|Frontend Web|Next.js (panel administrativo del tenant — sin sitio público, ver FA2)|
+|VM1|10.43.100.168|Gateway / Entry point|Nginx + API Gateway — enruta tráfico a Angular y a los 8 microservicios en VM3|
+|VM2|10.43.98.15|Frontend Web|Angular (panel administrativo del tenant — sin sitio público, ver FA2)|
 |VM3|10.43.98.205|Backend — microservicios|8 microservicios (Identity, Actors, Catalog, Matching, ServiceRequest, Ranking, Payments, Communication) como Deployments de Kubernetes (k3s)|
 |VM4|10.43.98.209|Base de datos|PostgreSQL + PostGIS (fuente de verdad, incluye datos geoespaciales)|
-|VM5|10.43.98.29|Cache / colas cortas|Redis (BullMQ para trabajos programados)|
+|VM5|10.43.98.29|Cache / colas cortas|Redis (cache y coordinación temporal para procesos programados)|
 |VM6|10.43.99.12|Mensajería asíncrona|Apache Kafka + Kafka UI (matching, ranking, notificaciones, pagos)|
 |VM7|10.43.99.8|Storage + Observabilidad|MinIO (evidencias fotográficas obligatorias al completar un servicio, ver RF-15) + Prometheus + Loki + Grafana (métricas y logs, ver Documento de Infraestructura, sección 7)|
 
@@ -918,7 +918,7 @@ Existen dependencias de arranque entre componentes: PostgreSQL y Kafka deben est
 1. VM4 (PostgreSQL/PostGIS) y VM5 (Redis)
 2. VM6 (Kafka) — los microservicios dependen del bus de eventos para operar correctamente
 3. VM3 (los 8 microservicios, vía Kubernetes/k3s)
-4. VM2 (Next.js) y VM1 (Nginx Gateway / API Gateway)
+4. VM2 (Angular) y VM1 (Nginx Gateway / API Gateway)
 5. VM7 (MinIO + Observabilidad) — independiente, puede iniciar en paralelo
 
 ### 5.4 Automatización, despliegue y CI/CD

@@ -1,40 +1,30 @@
 # Rol IA — Frontend Developer
 
-## Área principal
+## Canales
 
-Cuando exista código:
+### Admin Web
+- Ruta: `apps/web/**`
+- Stack: Angular + TypeScript
+- Usuarios: administración
 
-- `apps/web/**`
-- `apps/mobile/**`
-- pruebas unitarias/UI correspondientes
+### Mobile
+- Ruta: `apps/mobile/**`
+- Stack: Flutter + Dart
+- Usuarios: clientes y técnicos
 
-## Puede leer
+## Fuente de verdad
 
-- `.ai/**`
-- requisitos relevantes
-- escenarios UX/usabilidad
-- contratos OpenAPI/eventos expuestos al cliente
-- código backend solo para diagnóstico puntual
+REST/OpenAPI:
+`docs/contracts/openapi/`
 
-## No modificar por defecto
+No inventar endpoints, campos, respuestas o estados backend.
 
-- implementación de backend;
-- migraciones de base de datos;
+## Límites
+
+No modificar por defecto:
+- backend;
+- migraciones;
 - infraestructura;
-- configuración de despliegue;
-- lógica interna de otros servicios.
+- contratos sin declarar impacto.
 
-## Regla crítica
-
-No inventes endpoints, campos o respuestas.
-
-La API contratada es la fuente de verdad. Si el contrato no satisface una necesidad de UI, propón un cambio de contrato y señala impacto Backend + QA.
-
-## Antes de implementar
-
-1. identifica historia/requisito;
-2. identifica estados de UI;
-3. revisa contrato;
-4. revisa errores y estados vacíos;
-5. revisa aislamiento de tenant desde la experiencia del usuario;
-6. crea pruebas de comportamiento apropiadas.
+Si una UI requiere capacidad no contratada, proponer cambio Backend + QA.

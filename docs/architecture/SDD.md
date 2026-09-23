@@ -111,6 +111,8 @@ El Gateway no contiene reglas propias de matching, solicitudes, pagos, ranking n
 
 ### 3.2.2 Identity Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** identidad, autenticación, usuarios y tenancy.
 
 **Módulos lógicos:**
@@ -132,6 +134,8 @@ El Gateway no contiene reglas propias de matching, solicitudes, pagos, ranking n
 
 ### 3.2.3 Actors Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** actores de negocio distintos de la identidad técnica.
 
 **Módulos lógicos:**
@@ -150,6 +154,8 @@ La persistencia detallada de estos conceptos se incorpora al DD cuando el Sprint
 
 ### 3.2.4 Catalog Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** catálogo de servicios y especialidades.
 
 **Responsabilidades:**
@@ -163,6 +169,8 @@ La persistencia detallada de estos conceptos se incorpora al DD cuando el Sprint
 | `ServiceCategory` | `service_categories` | Categoría o tipo de servicio solicitado. |
 
 ### 3.2.5 ServiceRequest Service
+
+**Tecnología asignada:** ASP.NET Core / .NET.
 
 **Dominio:** ciclo de vida de la solicitud de servicio.
 
@@ -236,6 +244,8 @@ El siguiente diagrama representa el flujo lógico principal del proceso de match
 
 ### 3.2.7 Ranking Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** reputación y evaluación agregada.
 
 **Responsabilidades:**
@@ -247,6 +257,8 @@ El siguiente diagrama representa el flujo lógico principal del proceso de match
 Los modelos persistentes definitivos de ranking permanecen sujetos a evolución del DD.
 
 ### 3.2.8 Payments Service
+
+**Tecnología asignada:** ASP.NET Core / .NET.
 
 **Dominio:** pagos y facturación.
 
@@ -267,6 +279,8 @@ Los modelos persistentes definitivos de ranking permanecen sujetos a evolución 
 **Eventos:** `payment.approved`, `payment.rejected`.
 
 ### 3.2.9 Communication Service
+
+**Tecnología asignada:** ASP.NET Core / .NET.
 
 **Dominio:** notificaciones y comunicación desacoplada.
 
@@ -353,6 +367,21 @@ payment.rejected
   "data": {}
 }
 ```
+
+---
+
+## 3.5 Decisión tecnológica vigente
+
+La asignación tecnológica de los canales y microservicios se formaliza en `ADR-012 — Stack tecnológico políglota`:
+
+- panel administrativo: Angular + TypeScript;
+- aplicación móvil para clientes y técnicos: Flutter + Dart;
+- Identity, Actors, Catalog, ServiceRequest, Ranking, Payments y Communication: ASP.NET Core / .NET;
+- Matching: Java + Spring Boot;
+- integración síncrona: REST/HTTPS;
+- integración asíncrona: Apache Kafka.
+
+La interoperabilidad entre stacks se mantiene mediante contratos REST/OpenAPI y contratos versionados de eventos Kafka. Ningún consumidor depende de clases internas de otro servicio.
 
 ---
 
@@ -447,7 +476,7 @@ La arquitectura de QUICKPATCH distribuye sus procesos a lo largo de las 7 máqui
 | Proceso / Servicio | Entorno de Ejecución | VM / Host | Rol operativo |
 |---|---|---|---|
 | **App Móvil (Flutter)** | Dispositivos móviles (Android / iOS) | Cliente externo | Interfaz de clientes y técnicos en campo (FA1: requiere conexión activa). |
-| **Panel Web (Next.js)** | Node.js runtime en Docker Compose | VM2 (`10.43.98.15`) | Interfaz administrativa del tenant y operaciones (FA2). |
+| **Panel Web Administrativo (Angular)** | build estático Angular servido por Nginx en Docker Compose | VM2 (`10.43.98.15`) | Interfaz administrativa del tenant y operaciones (FA2). |
 | **API Gateway / Reverse Proxy** | Nginx | VM1 (`10.43.100.168`) | Punto único de entrada, enrutamiento, terminación TLS e inspección JWT. |
 | **Microservicios Backend (8)** | Pods independientes en clúster k3s | VM3 (`10.43.98.205`) | Ejecución de la lógica de negocio (Identity, Actors, Catalog, Matching, ServiceRequest, Ranking, Payments, Communication). |
 | **Motor de Base de Datos** | PostgreSQL 15 + PostGIS | VM4 (`10.43.98.209`) | Almacenamiento relacional transaccional y consultas geoespaciales. |
@@ -737,36 +766,385 @@ Esta sección establece los umbrales de sincronización y rendimiento operativo 
 - **Consumo de Recursos en VM3:** Consumo máximo de memoria de los 8 microservicios acotado a ≤ 6.5 GiB de RAM sobre los 11 GiB disponibles, con **0 reinicios por OOMKilled** bajo operación sostenida de 50 solicitudes concurrentes (AC2-E5, ver presupuesto en Documento de Infraestructura, sección 5.6).
 
 ---
+# 6. Vista de Desarrollo
 
-# 6. Vista de Desarrollo - pendiente de integración
+La Vista de Desarrollo describe la organización estática del software de QUICKPATCH desde la perspectiva de implementación. Su propósito es definir cómo se distribuyen las aplicaciones, microservicios, proyectos, capas, contratos, dependencias y pruebas dentro del repositorio.
 
-**Corresponde a:** Backend + Frontend (Miguel).
+Esta vista mantiene la decisión tecnológica vigente:
 
-## Recomendación de contenido
-
-- estructura real del repositorio;
-- organización por aplicación y microservicio;
-- proyectos/capas del backend .NET;
-- paquetes del Matching Service en Java/Spring Boot;
-- organización Flutter;
-- organización Next.js;
-- librerías compartidas permitidas;
-- contratos y DTOs;
-- ubicación de pruebas;
-- dependencias entre proyectos;
-- convenciones de nombres;
-- reglas de acoplamiento entre servicios;
-- integración con CI/CD por servicio.
-
-## Diagramas recomendados
-
-- diagrama de paquetes del repositorio;
-- diagrama de componentes por aplicación;
-- diagrama de dependencias entre proyectos/módulos;
-- mapa de carpetas y artefactos de build.
+- panel administrativo: Angular + TypeScript;
+- aplicación móvil: Flutter + Dart;
+- Identity, Actors, Catalog, ServiceRequest, Ranking, Payments y Communication: ASP.NET Core / .NET;
+- Matching: Java + Spring Boot;
+- integración síncrona: REST/HTTPS;
+- integración asíncrona: Apache Kafka.
 
 ---
 
+## 6.1 Estructura del repositorio
+
+QUICKPATCH utiliza un repositorio único organizado por áreas de responsabilidad.
+
+Las carpetas principales relacionadas con el desarrollo son:
+
+```text
+apps/
+├── web/
+├── mobile/
+└── backend/
+    └── services/
+        ├── identity/
+        ├── actors/
+        ├── catalog/
+        ├── service-request/
+        ├── matching/
+        ├── ranking/
+        ├── payments/
+        └── communication/
+
+tests/
+├── integration/
+├── contract/
+├── e2e/
+├── performance/
+└── security/
+
+infrastructure/
+
+docs/
+├── requirements/
+├── architecture/
+├── design/
+├── infrastructure/
+├── governance/
+└── contracts/
+    ├── openapi/
+    └── events/
+```
+
+`apps/` concentra el código productivo; `tests/` contiene las pruebas transversales; `infrastructure/` contiene los artefactos asociados al despliegue; y `docs/contracts/` mantiene las fronteras versionadas utilizadas por las aplicaciones y microservicios.
+
+![Estructura del repositorio QUICKPATCH](diagrams/sdd/07_vista_desarrollo_repositorio.svg)
+
+**Figura 7. Estructura del repositorio y organización del monorepo QUICKPATCH.**
+
+La Figura 7 representa la estructura vigente del repositorio. La organización interna detallada del código dentro de algunas aplicaciones todavía se incorporará conforme avance la implementación.
+
+---
+
+## 6.2 Organización por aplicación
+
+### 6.2.1 Aplicación web administrativa
+
+El panel administrativo se ubica en:
+
+```text
+apps/web/
+```
+
+y utiliza **Angular + TypeScript**.
+
+Su responsabilidad es implementar las funcionalidades administrativas de QUICKPATCH y consumir los contratos REST publicados por el backend.
+
+La organización interna objetivo separa:
+
+- presentación;
+- funcionalidades o módulos;
+- componentes reutilizables;
+- servicios de aplicación;
+- cliente REST;
+- pruebas unitarias.
+
+El frontend no debe definir de forma independiente endpoints o estructuras de respuesta que no estén representados en los contratos publicados.
+
+### 6.2.2 Aplicación móvil
+
+La aplicación móvil se ubica en:
+
+```text
+apps/mobile/
+```
+
+y utiliza **Flutter + Dart**.
+
+Atiende los flujos correspondientes a clientes y técnicos y consume las capacidades del backend mediante REST.
+
+Su organización de desarrollo contempla:
+
+- presentación;
+- funcionalidades o `features`;
+- elementos de núcleo o `core`;
+- componentes compartidos;
+- cliente REST;
+- pruebas unitarias.
+
+### 6.2.3 Backend
+
+Los servicios backend se ubican en:
+
+```text
+apps/backend/services/
+```
+
+La asignación tecnológica definida por el SDD es:
+
+| Microservicio | Tecnología |
+|---|---|
+| `identity/` | ASP.NET Core / .NET |
+| `actors/` | ASP.NET Core / .NET |
+| `catalog/` | ASP.NET Core / .NET |
+| `service-request/` | ASP.NET Core / .NET |
+| `matching/` | Java + Spring Boot |
+| `ranking/` | ASP.NET Core / .NET |
+| `payments/` | ASP.NET Core / .NET |
+| `communication/` | ASP.NET Core / .NET |
+
+Cada servicio mantiene su propio límite funcional y debe poder evolucionar y desplegarse sin requerir dependencia directa del código interno de otro microservicio.
+
+![Componentes por aplicación](diagrams/sdd/08_componentes_por_aplicacion.svg)
+
+**Figura 8. Organización de componentes por aplicación y tecnología.**
+
+---
+
+## 6.3 Estructura interna de los microservicios
+
+La Vista Lógica y el Diseño Detallado establecen una estructura común de cuatro capas para los microservicios backend:
+
+| Capa | Contenido |
+|---|---|
+| **API / Interface** | Controllers, endpoints, validación de entrada y contratos expuestos |
+| **Application** | Casos de uso, comandos, queries y coordinación del flujo de aplicación |
+| **Domain** | Entidades, value objects y reglas de negocio |
+| **Infrastructure** | Repositorios, Kafka, PostgreSQL, Redis, PSP y adaptadores externos |
+
+La dirección conceptual de dependencias es:
+
+```text
+API / Interface
+      |
+      v
+Application
+      |
+      v
+Domain
+
+Infrastructure
+      |
+      +----> Application / Domain
+             mediante interfaces
+```
+
+La capa `Domain` concentra las reglas de negocio y no debe depender directamente de mecanismos externos como Kafka, PostgreSQL, Redis o proveedores de pago.
+
+Los siete servicios ASP.NET Core y `Matching Service` mantienen la misma separación conceptual, aunque cada tecnología utilice mecanismos propios para implementarla.
+
+---
+
+## 6.4 Contratos, DTOs y elementos compartidos
+
+La comunicación entre aplicaciones y microservicios se realiza mediante contratos explícitos.
+
+### REST / OpenAPI
+
+Los contratos REST se mantienen en:
+
+```text
+docs/contracts/openapi/
+```
+
+Estos contratos constituyen la frontera entre Angular, Flutter y los servicios backend.
+
+Los clientes no deben depender de clases internas del backend ni asumir campos que no formen parte del contrato publicado.
+
+### Eventos Kafka
+
+Los contratos de eventos se mantienen en:
+
+```text
+docs/contracts/events/
+```
+
+Los eventos permiten integrar servicios de forma asíncrona sin compartir implementaciones internas.
+
+Cada contrato de evento debe identificar como mínimo:
+
+- nombre;
+- versión;
+- productor;
+- consumidores;
+- esquema;
+- campos obligatorios y opcionales;
+- semántica;
+- compatibilidad.
+
+### DTOs y código compartido
+
+Los DTOs utilizados internamente pertenecen al componente que los implementa.
+
+No se establece una librería común de lógica de dominio entre los microservicios. En particular, los servicios .NET y `Matching Service` en Java no comparten clases internas; su interoperabilidad depende de contratos REST/OpenAPI y eventos Kafka versionados.
+
+---
+
+## 6.5 Dependencias entre proyectos y módulos
+
+Las dependencias deben respetar los límites definidos por la arquitectura.
+
+Las principales reglas son:
+
+1. Angular y Flutter consumen servicios mediante REST.
+2. Las solicitudes síncronas ingresan a través del API Gateway.
+3. Kafka se utiliza para coordinación asíncrona entre dominios.
+4. Los servicios .NET y Java se integran mediante contratos, no mediante código compartido de negocio.
+5. Un microservicio no importa directamente la lógica interna de otro.
+6. Un microservicio no realiza escrituras directas sobre datos propiedad de otro servicio.
+7. `API / Interface` depende de `Application`.
+8. `Application` utiliza `Domain`.
+9. `Infrastructure` implementa los mecanismos externos requeridos por `Application` y `Domain`.
+
+![Dependencias entre proyectos y módulos](diagrams/sdd/09_dependencias_modulos.svg)
+
+**Figura 9. Dependencias permitidas entre aplicaciones, contratos y microservicios.**
+
+Estas reglas mantienen bajo el acoplamiento entre servicios y preservan la independencia tecnológica entre ASP.NET Core y Spring Boot.
+
+---
+
+## 6.6 Organización de pruebas
+
+Las pruebas se dividen entre pruebas próximas al componente propietario y pruebas transversales.
+
+Las pruebas unitarias permanecen preferiblemente junto al código de la aplicación o microservicio correspondiente.
+
+Las pruebas que requieren interacción entre varios componentes se ubican en:
+
+```text
+tests/
+├── integration/
+├── contract/
+├── e2e/
+├── performance/
+└── security/
+```
+
+| Carpeta | Propósito |
+|---|---|
+| `integration/` | Validar integración entre componentes y dependencias |
+| `contract/` | Verificar compatibilidad entre productores y consumidores |
+| `e2e/` | Validar flujos completos del sistema |
+| `performance/` | Verificar escenarios de rendimiento y carga |
+| `security/` | Ejecutar validaciones de seguridad |
+
+Entre las herramientas de prueba previstas para los diferentes componentes se encuentran:
+
+- `dotnet test` para los servicios ASP.NET Core;
+- Maven o Gradle para las pruebas de Matching;
+- `ng test` para Angular;
+- `flutter test` para Flutter.
+
+---
+
+## 6.7 Convenciones de organización y nombres
+
+El código debe seguir las convenciones propias de cada lenguaje y framework, manteniendo consistencia entre los diferentes componentes.
+
+Como reglas generales:
+
+- variables y funciones utilizan las convenciones del lenguaje correspondiente;
+- clases utilizan `PascalCase` cuando aplica;
+- tablas y columnas PostgreSQL utilizan `snake_case`;
+- los nombres de elementos de dominio deben reflejar el vocabulario de QUICKPATCH;
+- los términos obligatorios del framework conservan su nomenclatura técnica;
+- las carpetas deben respetar los límites de aplicación, servicio y dominio definidos por esta vista.
+
+Las convenciones no deben utilizarse para crear dependencias entre microservicios ni para compartir lógica de dominio que pertenece a un servicio específico.
+
+---
+
+## 6.8 Build y artefactos
+
+Cada aplicación y microservicio mantiene su propio proceso de construcción.
+
+### Panel Angular
+
+El proceso produce los artefactos estáticos que posteriormente son servidos mediante Nginx.
+
+```text
+Angular
+   ↓
+pruebas / build
+   ↓
+artefactos web
+```
+
+### Aplicación Flutter
+
+El proceso de construcción incluye análisis, pruebas y generación del artefacto correspondiente a la plataforma objetivo.
+
+```text
+flutter analyze
+      ↓
+flutter test
+      ↓
+flutter build
+      ↓
+artefacto móvil
+```
+
+### Microservicios ASP.NET Core
+
+Los siete servicios .NET se construyen y prueban de manera independiente y generan imágenes Docker independientes.
+
+### Matching Service
+
+`Matching Service` mantiene su propio proceso de build y pruebas bajo Java/Spring Boot y genera igualmente una imagen Docker independiente.
+
+Las ocho imágenes del backend se publican en el registro definido para el proyecto y son desplegadas individualmente.
+
+![Mapa de carpetas y artefactos de build](diagrams/sdd/10_mapa_carpetas_build.svg)
+
+**Figura 10. Relación entre código fuente, procesos de build, pruebas, artefactos y despliegue.**
+
+---
+
+## 6.9 Integración con CI/CD
+
+La arquitectura de desarrollo establece pipelines separados por aplicación y por microservicio.
+
+Un cambio en un único servicio debe ejecutar el pipeline correspondiente al componente afectado, sin requerir el build completo de los ocho microservicios.
+
+Los gates definidos son:
+
+| Rama / etapa | Validaciones principales |
+|---|---|
+| `feature/*` → PR a `develop` | Lint + pruebas unitarias del componente afectado |
+| `develop` | Pruebas de integración y contrato |
+| `release/x.y.z` | E2E, UAT y seguridad |
+| `main` | Build y despliegue |
+| Post-despliegue | Smoke tests y pruebas de rendimiento |
+
+El detalle operativo del pipeline pertenece a la infraestructura del proyecto. Desde la Vista de Desarrollo, la regla relevante es que cada aplicación o servicio debe poder construirse, probarse y desplegarse de forma independiente.
+
+---
+
+## 6.10 Regla de actualización de la vista
+
+La Vista de Desarrollo debe mantenerse sincronizada con el repositorio real.
+
+Debe actualizarse cuando se produzcan cambios como:
+
+- creación o eliminación de una aplicación;
+- creación, división o eliminación de un microservicio;
+- modificación del stack tecnológico;
+- cambio en la estructura interna de proyectos o capas;
+- modificación de contratos compartidos;
+- cambio en la organización de pruebas;
+- cambio en las dependencias permitidas;
+- modificación significativa del proceso de build o CI/CD.
+
+Los diagramas de esta sección no deben representar como implementada una carpeta o estructura que todavía exista únicamente como diseño objetivo. Cuando exista esa diferencia, debe quedar indicada explícitamente.
+
+---
 # 7. Vista Física
 
 **Corresponde a:** DevOps (Sebastian).
@@ -786,7 +1164,7 @@ flowchart TB
             VM1["Gateway<br/>Nginx + API Gateway"]
         end
         subgraph VM2N["VM2 · 10.43.98.15"]
-            VM2["Frontend Web<br/>Next.js — panel admin"]
+            VM2["Frontend Web<br/>Angular — panel admin"]
         end
         subgraph VM3N["VM3 · 10.43.98.205"]
             VM3["Backend — k3s, nodo único<br/>8 microservicios:<br/>Identity · Actors · Catalog<br/>Matching · ServiceRequest<br/>Ranking · Payments · Communication"]
@@ -884,7 +1262,7 @@ flowchart TB
 
     subgraph RED["Red privada — 10.43.x.x"]
         direction LR
-        VM2N["VM2<br/>Next.js"]
+        VM2N["VM2<br/>Angular"]
         VM3N["VM3<br/>k3s"]
         VM4N["VM4<br/>PostgreSQL"]
         VM5N["VM5<br/>Redis"]
@@ -980,7 +1358,7 @@ Para cada escenario se documenta: actor, precondiciones, flujo principal, flujos
 | **Eventos / Endpoints** | `POST /v1/auth/register/client`, `POST /v1/auth/login`, `POST /v1/service-requests` · produce `service-request.created`. |
 | **Relación con Vista Lógica** | Identity Service + Catalog Service + ServiceRequest Service (Sección 3.2). |
 | **Relación con Vista de Procesos** | **Resuelto:** Ver **Sección 5.2** (flujos síncronos frente al cliente) y **Sección 5.3** (ingesta síncrona y publicación asíncrona por Outbox). |
-| **Relación con Vista de Desarrollo** | *Pendiente Backend+Frontend* — formulario de registro/solicitud (Next.js / Flutter) contra los contratos REST anteriores. |
+| **Relación con Vista de Desarrollo** | *Pendiente Backend+Frontend* — formulario de registro/solicitud (Angular / Flutter) contra los contratos REST anteriores. |
 | **Relación con Vista Física** | *Pendiente DevOps* — ruta API Gateway → Identity/Catalog/ServiceRequest dentro del clúster k3s. |
 | **Requisitos (SRS)** | RF-01, RF-03, RF-04, RF-06, RF-07, RF-08 |
 

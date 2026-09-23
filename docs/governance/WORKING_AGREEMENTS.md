@@ -31,7 +31,7 @@ Bogotá, Colombia — 14 de agosto de 2026
 
 ## Introducción
 
-Este documento define los **estándares y políticas de trabajo del equipo** para el desarrollo de QUICKPATCH (Next.js, Flutter, NestJS, PostgreSQL/PostGIS, Redis, Apache Kafka y MinIO): el flujo de trabajo en Git (GitFlow), las políticas de colaboración, el versionamiento semántico, la gestión del backlog, el estilo de código, el uso responsable de IA, y las herramientas de documentación técnica. Su objetivo es que todo el equipo trabaje bajo las mismas reglas, independientemente de qué módulo o funcionalidad esté desarrollando cada persona.
+Este documento define los **estándares y políticas de trabajo del equipo** para el desarrollo de QUICKPATCH (Angular, Flutter, ASP.NET Core, PostgreSQL/PostGIS, Redis, Apache Kafka y MinIO): el flujo de trabajo en Git (GitFlow), las políticas de colaboración, el versionamiento semántico, la gestión del backlog, el estilo de código, el uso responsable de IA, y las herramientas de documentación técnica. Su objetivo es que todo el equipo trabaje bajo las mismas reglas, independientemente de qué módulo o funcionalidad esté desarrollando cada persona.
 
 La propuesta de infraestructura distribuida (despliegue sobre las 7 máquinas virtuales, contenedores, CI/CD, monitoreo y gestión de secretos) se documenta por separado en el anexo _"Propuesta de Infraestructura DevOps"_, ya que responde a decisiones de arquitectura técnica en lugar de a políticas de trabajo del equipo.
 
@@ -44,8 +44,8 @@ El proyecto opera sobre **7 máquinas virtuales**, administradas por el rol de D
 |VM|Rol|Para qué sirve|
 |---|---|---|
 |VM1|Gateway|Recibe el tráfico entrante y lo dirige hacia el sitio web o la API|
-|VM2|Frontend Web|Sirve el sitio público y el panel administrativo (Next.js)|
-|VM3|Backend|Ejecuta la lógica de negocio de la plataforma (NestJS)|
+|VM2|Frontend Web|Sirve el sitio público y el panel administrativo (Angular)|
+|VM3|Backend|Ejecuta la lógica de negocio de la plataforma (ASP.NET Core)|
 |VM4|Base de datos|Almacena la información del sistema, incluida la geolocalización (PostgreSQL + PostGIS)|
 |VM5|Cache|Acelera respuestas frecuentes y gestiona colas de trabajos programados (Redis)|
 |VM6|Mensajería|Procesa eventos en segundo plano: matching, ranking, notificaciones, pagos (Kafka)|
@@ -180,8 +180,8 @@ _Nota:_ si el bug es de código que la misma persona metió dentro de la `featur
 
 |Rama|Pruebas|
 |---|---|
-|`feature/*`|Unitarias (Jest, flutter_test) mientras se desarrolla; lint + unitarias como gate obligatorio en el PR hacia `develop`|
-|`develop`|Integración (Testcontainers: PostgreSQL/PostGIS y Kafka reales en Docker); tests de contrato (Pact) entre Flutter/Next.js y la API de NestJS|
+|`feature/*`|Unitarias (dotnet test / pruebas Java / ng test / flutter_test) mientras se desarrolla; lint + unitarias como gate obligatorio en el PR hacia `develop`|
+|`develop`|Integración (Testcontainers: PostgreSQL/PostGIS y Kafka reales en Docker); tests de contrato (Pact) entre Flutter/Angular y la API de ASP.NET Core|
 |`release/x.y.z`|End-to-end (Playwright / Patrol) de los flujos completos, regresión, UAT contra los escenarios de aceptación del cliente, carga/rendimiento (k6), seguridad (OWASP ZAP, alcance PCI-DSS), y _smoke tests_ en el ambiente de staging antes del merge a `main`|
 
 **Regla práctica:** si una prueba es rápida y aísla una sola pieza de código, va en cada PR/feature. Si es lenta, cubre el sistema completo, o necesita un ambiente real (staging), va en `release`.
@@ -454,9 +454,9 @@ Todas las herramientas seleccionadas para el proyecto cuentan con un plan gratui
 |`node_exporter`|Gratis|Open source; agente de métricas de sistema operativo en cada una de las 7 VMs|
 |Loki|Gratis|Open source; almacena el historial de logs agregados de las 7 VMs|
 |Promtail|Gratis|Open source; agente que recolecta los logs de cada VM y los envía a Loki|
-|Pino|Gratis|Open source; librería de logging estructurado para Node.js — logs de aplicación|
+|Logging estructurado .NET/Spring|Gratis|`Microsoft.Extensions.Logging`/Serilog para .NET y SLF4J/Logback en Spring; salida estructurada recolectada por Promtail|
 |Testcontainers|Gratis|Open source; levanta PostgreSQL/PostGIS y Kafka reales en Docker para las pruebas de integración de `develop`|
-|Pact|Gratis (con límites)|Pact Broker en la nube tiene plan gratuito; pruebas de contrato entre Flutter/Next.js y la API de NestJS|
+|Pact|Gratis (con límites)|Pact Broker en la nube tiene plan gratuito; pruebas de contrato entre Flutter/Angular y la API de ASP.NET Core|
 |Playwright|Gratis|Open source; pruebas E2E del panel web en `release/*`|
 |Patrol|Gratis|Open source; pruebas E2E de la app Flutter en `release/*`|
 |k6|Gratis|Open source; prueba de carga (150 matchings concurrentes) contra VM3 real, en ventana de mantenimiento|
@@ -469,15 +469,15 @@ Todas las herramientas seleccionadas para el proyecto cuentan con un plan gratui
 
 ## Estilo de código
 
-El código de negocio se escribe en **español**, con excepción de los términos que son sintaxis obligatoria del lenguaje o del framework. Esta sección establece la convención para que sea consistente entre los tres frentes del stack (NestJS/TypeScript, Next.js/TypeScript, Flutter/Dart).
+El código de negocio se escribe en **español**, con excepción de los términos que son sintaxis obligatoria del lenguaje o del framework. Esta sección establece la convención para que sea consistente entre los tres frentes del stack (ASP.NET Core/TypeScript, Angular/TypeScript, Flutter/Dart).
 
 ### Idioma del código
 
-- **En inglés:** la sintaxis propia del lenguaje (`if`, `for`, `function`, `class`, `return`) y los términos de framework que ya vienen en inglés por convención técnica (`Controller`, `Service`, `Repository`, `DTO`, `Module` en NestJS) — traducirlos rompería la convención de nombres de archivo que el framework espera (`.controller.ts`, `.service.ts`).
+- **En inglés:** la sintaxis propia del lenguaje (`if`, `for`, `function`, `class`, `return`) y los términos de framework que ya vienen en inglés por convención técnica (`Controller`, `Service`, `Repository`, `DTO`, `Module` en ASP.NET Core) — traducirlos rompería la convención de nombres de archivo que el framework espera (`.controller.ts`, `.service.ts`).
 - **En español:** nombres de variables, funciones, clases de dominio del negocio, y comentarios.
 
 ```typescript
-// NestJS - clase de dominio en espanol, sufijo de framework en ingles
+// ASP.NET Core - clase de dominio en espanol, sufijo de framework en ingles
 class SolicitudServicioController {
   async crearSolicitud(datos: CrearSolicitudDto) {
     // Se valida disponibilidad antes de confirmar la cotizacion
@@ -513,16 +513,16 @@ function calcularReputacionAliado(aliadoId: string): number {
 |Clases (TS/Dart)|PascalCase|`SolicitudServicio`|
 |Tablas y columnas (PostgreSQL)|snake_case|`service_request`, `tenant_id`|
 
-_No se fuerza snake_case en el código de aplicación:_ ESLint y el analizador de Dart esperan camelCase/PascalCase por defecto, y las librerías del stack (NestJS, Flutter) generan código siguiendo esa convención. Forzar snake_case ahí generaría conflicto constante con el linter sin aportar beneficio real — snake_case se reserva para la base de datos, donde sí es el estándar de PostgreSQL.
+_No se fuerza snake_case en el código de aplicación:_ ESLint y el analizador de Dart esperan camelCase/PascalCase por defecto, y las librerías del stack (ASP.NET Core, Flutter) generan código siguiendo esa convención. Forzar snake_case ahí generaría conflicto constante con el linter sin aportar beneficio real — snake_case se reserva para la base de datos, donde sí es el estándar de PostgreSQL.
 
 ### Linter y formatter
 
-Un **linter** revisa reglas de calidad y detecta errores de estilo o malas prácticas; un **formatter** corrige automáticamente la forma del código (espacios, comillas, saltos de línea). No son extensiones del editor — son paquetes reales del proyecto (dependencias de npm o del SDK de Dart), configurados con un archivo (`.eslintrc.json`, `.prettierrc`), que se ejecutan por línea de comandos y, sobre todo, **dentro del pipeline de CI**. La extensión del editor (VS Code, por ejemplo) es solo una comodidad visual — muestra el error mientras se escribe — pero la regla se hace cumplir de verdad en CI, sin depender de que cada persona tenga la extensión instalada.
+Un **linter** revisa reglas de calidad y detecta errores de estilo o malas prácticas; un **formatter** corrige automáticamente la forma del código (espacios, comillas, saltos de línea). No son extensiones del editor — son paquetes reales del proyecto (herramientas o dependencias del stack correspondiente: npm para Angular, SDK .NET para ASP.NET Core, Maven/Gradle para Spring Boot y SDK de Dart/Flutter), configurados con un archivo (`.eslintrc.json`, `.prettierrc`), que se ejecutan por línea de comandos y, sobre todo, **dentro del pipeline de CI**. La extensión del editor (VS Code, por ejemplo) es solo una comodidad visual — muestra el error mientras se escribe — pero la regla se hace cumplir de verdad en CI, sin depender de que cada persona tenga la extensión instalada.
 
 |Frente|Herramienta|Qué hace|
 |---|---|---|
-|NestJS / Next.js|ESLint|Revisa calidad y estilo del código TypeScript|
-|NestJS / Next.js|Prettier|Formatea automáticamente (espacios, comillas, saltos de línea)|
+|ASP.NET Core / Angular|ESLint|Revisa calidad y estilo del código TypeScript|
+|ASP.NET Core / Angular|Prettier|Formatea automáticamente (espacios, comillas, saltos de línea)|
 |Flutter|`flutter analyze`|Revisa reglas de estilo y errores comunes en Dart|
 |Flutter|`dart format`|Formatea automáticamente el código Dart|
 
@@ -530,7 +530,7 @@ Ambas herramientas corren como _gate_ obligatorio en CI (ver sección "CI/CD" de
 
 ### Convención de archivos y carpetas
 
-**Estructura de carpetas:** ya definida por dominio en el documento de arquitectura — organización feature-first en Flutter, módulos de dominio en NestJS, App Router en Next.js. No cambia con esta sección.
+**Estructura de carpetas:** ya definida por dominio en el documento de arquitectura — organización feature-first en Flutter, módulos de dominio en ASP.NET Core, App Router en Angular. No cambia con esta sección.
 
 **Nombres de archivo individuales:** `kebab-case` (guiones), independientemente del idioma del código interno, porque es lo que espera el tooling de TypeScript y Dart:
 
@@ -540,7 +540,7 @@ matching.controller.ts
 ally-workspace-page.dart
 ```
 
-**Excepción:** Next.js (App Router) obliga ciertos nombres de archivo en inglés porque son parte de su convención técnica — el framework solo los reconoce así, no se pueden traducir: `page.tsx`, `layout.tsx`, `route.ts`.
+**Excepción:** Angular (App Router) obliga ciertos nombres de archivo en inglés porque son parte de su convención técnica — el framework solo los reconoce así, no se pueden traducir: `page.tsx`, `layout.tsx`, `route.ts`.
 
 ---
 
@@ -614,8 +614,8 @@ La arquitectura del sistema se documenta con el **C4 Model**. No es una herramie
 |Nivel|Nombre|Qué muestra|Ejemplo en el proyecto|
 |---|---|---|---|
 |C1|Context (Contexto)|El sistema completo como caja negra, y quién interactúa con él|QUICKPATCH en el centro, rodeado de Cliente, Aliado/Técnico, Proveedor, y la pasarela de pago Wompi|
-|C2|Containers (Contenedores)|Las piezas grandes que componen el sistema y cómo se comunican|Next.js, Flutter, NestJS, PostgreSQL+PostGIS, Redis, Kafka, MinIO|
-|C3|Components (Componentes)|Los módulos internos de UN contenedor específico|Dentro de NestJS: Matching, Payments, Ranking, Billing, etc.|
+|C2|Containers (Contenedores)|Las piezas grandes que componen el sistema y cómo se comunican|Angular, Flutter, ASP.NET Core, PostgreSQL+PostGIS, Redis, Kafka, MinIO|
+|C3|Components (Componentes)|Los módulos internos de UN contenedor específico|Dentro de ASP.NET Core: Matching, Payments, Ranking, Billing, etc.|
 |C4|Code (Código)|Clases y relaciones a nivel de código|Rara vez se dibuja a mano; se genera desde el IDE si hace falta|
 
 ### Herramienta: Mermaid
