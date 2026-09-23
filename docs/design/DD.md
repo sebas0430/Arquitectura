@@ -7,7 +7,7 @@ Plataforma Digital Multi-tenant de Servicios Técnicos para el Hogar y las Empre
 |---|---|
 |**Tipo de documento**|Diccionario de Datos Evolutivo|
 |**Arquitectura**|Microservicios + Event-Driven Architecture|
-|**Backend principal**|Por definir (Matching Service: Java + Spring Boot)|
+|**Backend principal**|ASP.NET Core / .NET (7 servicios); Matching Service: Java + Spring Boot|
 |**Mensajería**|Apache Kafka|
 |**Persistencia**|PostgreSQL + PostGIS|
 |**Versión**|2.2|
@@ -1096,7 +1096,7 @@ Cada regla se hace cumplir con un mecanismo concreto. Cuando la regla depende de
 |RN-P5|Índice único parcial sobre los pagos abiertos, y paso a `procesando` con `UPDATE ... WHERE status = 'pendiente' RETURNING id`, que solo una petición concurrente puede completar. El `id` del pago viaja como clave de idempotencia hacia la pasarela cuando esta la soporte.|
 |RN-Q2, RN-Q4|Índices únicos parciales sobre `quotes` (sección 5.11). ServiceRequest Service no expone ninguna operación que modifique una cotización aceptada.|
 |RN-Q5, RN-Q7|Lógica de cancelación y de rechazo en ServiceRequest Service. RN-Q7 cuenta las cotizaciones con la fila de la solicitud bloqueada (`SELECT ... FOR UPDATE`) para evitar carreras.|
-|RN-Q6|Tarea programada de ServiceRequest Service sobre Redis (BullMQ en VM5, SAD sección 5.1).|
+|RN-Q6|Tarea programada de ServiceRequest Service con coordinación temporal mediante Redis en VM5 (SAD sección 5.1).|
 |RN-A1|Permisos: los roles de aplicación solo tienen `INSERT` y `SELECT` sobre `audit_logs` (sección 10.2).|
 
 ---
@@ -1373,7 +1373,7 @@ El aislamiento entre tenants sigue ADR-005 (shared-schema con `tenant_id` + Row 
 
 Solo Identity Service abre un segundo pool, limitado a 2 conexiones, para `identity_platform`. El rol del publicador y el de migraciones no abren pools permanentes, así que el uso base de conexiones a PostgreSQL pasa de 45 a 47 de las 100 disponibles y se conserva el margen para escalar Matching (Documento de Infraestructura, sección 5.7).
 
-Al inicio de cada transacción con el rol `_app`, el servicio fija el tenant con `SET LOCAL app.current_tenant = '<uuid>'`. Como `SET LOCAL` solo dura lo que dura la transacción, toda consulta de negocio debe ejecutarse dentro de una transacción que primero fije el tenant. Con Prisma, que es el ORM que asume el Documento de Infraestructura (sección 5.7), eso implica usar transacciones interactivas o una extensión del cliente que haga ese paso en cada operación (DEP-12). Cada tabla de negocio define una política equivalente a la siguiente:
+Al inicio de cada transacción con el rol `_app`, el servicio fija el tenant con `SET LOCAL app.current_tenant = '<uuid>'`. Como `SET LOCAL` solo dura lo que dura la transacción, toda consulta de negocio debe ejecutarse dentro de una transacción que primero fije el tenant. Con EF Core + Npgsql, stack vigente de los servicios .NET, la operación debe ejecutarse en una transacción que establezca `SET LOCAL app.current_tenant` antes de las consultas de negocio. Matching aplica la misma regla de aislamiento desde su stack Java/Spring cuando accede a datos sujetos a tenant. Cada tabla de negocio define una política equivalente a la siguiente:
 
 ```sql
 ALTER TABLE service_requests ENABLE ROW LEVEL SECURITY;
@@ -1459,7 +1459,7 @@ El modelo de esta versión depende de las siguientes decisiones de diseño, que 
 |DEP-09|Sección 10.3|Identificación del canal de registro de cada tenant cuando opere más de uno.|RNF-09|
 |DEP-10|`quotes`, estado `cancelado`, `service_evidence`|Requisitos en el SRS para la cotización, la cancelación y la evidencia fotográfica obligatoria, que el SAD define y el SRS v3.1 no incluye.|SAD, sección 7.4 y D7|
 |DEP-11|RN-R3|Orden entre evaluación y pago. El SRS (RF-12) permite calificar desde `completado` y el SAD (sección 7.4) libera el pago después de la evaluación, mientras que el SDD (escenario 7) y RF-27 ponen el pago antes de la calificación. Este documento sigue al SDD y a RF-27.|RF-12, RF-27; SDD, escenario 7|
-|DEP-12|Sección 10.2|Tecnología del backend: el Documento de Infraestructura (secciones 5.6 y 5.7) asume NestJS con Prisma y el SDD (sección 6) menciona .NET.|Infraestructura 5.6 y 5.7|
+|DEP-12|Sección 10.2|Resuelto mediante ADR-012: Identity, Actors, Catalog, ServiceRequest, Ranking, Payments y Communication usan ASP.NET Core/.NET; Matching usa Java + Spring Boot. Para persistencia se adopta EF Core + Npgsql en .NET y Spring Data/JPA en Matching.|ADR-012; Infraestructura 5.6 y 5.7|
 |DEP-13|`tenants`, `register/company`|RF-06 asocia cada empresa cliente a un tenant propio; el SAD (sección 7.1) define el tenant como la empresa oferente y a las empresas cliente como usuarios de ese tenant. Este documento sigue al SAD, así que RF-06 no queda cubierto tal como está redactado.|RF-06; SAD, sección 7.1|
 |DEP-14|`payments`|El SAD (sección 8.1) lista la entidad `PayoutRecord`, pero K1 excluye la liquidación a técnicos. Este documento no la modela.|K1; SAD, sección 8.1|
 

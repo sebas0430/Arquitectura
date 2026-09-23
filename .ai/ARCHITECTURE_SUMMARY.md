@@ -1,68 +1,52 @@
 # QUICKPATCH — Resumen arquitectónico para agentes
 
-## Fuentes formales
+## Fuentes
 
-- Requisitos: `docs/requirements/SRS.md`
-- Arquitectura: `docs/architecture/SAD.md`
-- Diseño: `docs/architecture/SDD.md`
-- Datos/contratos: `docs/design/DD.md`
+- SRS: `docs/requirements/SRS.md`
+- SAD: `docs/architecture/SAD.md`
+- SDD: `docs/architecture/SDD.md`
+- DD: `docs/design/DD.md`
 - Infraestructura: `docs/infrastructure/INFRASTRUCTURE.md`
-- Políticas de trabajo: `docs/governance/WORKING_AGREEMENTS.md`
-- Índice documental: `docs/README.md`
+- ADR tecnológica: `docs/architecture/adr/ADR-012-stack-tecnologico-polyglot.md`
 
-## Componentes de dominio
+## Canales
 
-La documentación vigente referencia ocho capacidades/microservicios principales:
+- Admin: Angular Web.
+- Cliente/técnico: Flutter Mobile.
 
-- Identity
-- Actors
-- Catalog
-- ServiceRequest
-- Matching
-- Ranking
-- Payments
-- Communication
+## Servicios
 
-El nombre exacto de módulos y su implementación debe verificarse contra `docs/architecture/SAD.md` y `docs/architecture/SDD.md` antes de crear código.
+| Servicio | Stack |
+|---|---|
+| Identity | ASP.NET Core |
+| Actors | ASP.NET Core |
+| Catalog | ASP.NET Core |
+| ServiceRequest | ASP.NET Core |
+| Matching | Java + Spring Boot |
+| Ranking | ASP.NET Core |
+| Payments | ASP.NET Core |
+| Communication | ASP.NET Core |
 
-## Integraciones
+## Integración
 
-### Síncronas
+### REST
+Interacción síncrona cuando el consumidor requiere respuesta inmediata.
 
-El API Gateway concentra la entrada y enruta hacia los servicios correspondientes.
+### Kafka
+Hechos de dominio y coordinación asíncrona. La EDA no obliga a convertir toda comunicación a eventos.
 
-### Asíncronas
+### Datos
+PostgreSQL/PostGIS. Cada servicio mantiene ownership lógico de sus datos.
 
-Kafka comunica procesos de negocio donde se requiere desacoplamiento, resiliencia o procesamiento en segundo plano.
+### Infraestructura
+8 microservicios en VM3/k3s; resto de roles distribuidos entre las 7 VMs según `INFRASTRUCTURE.md`.
 
-### Persistencia
-
-PostgreSQL/PostGIS soporta datos relacionales y geoespaciales.
-
-MinIO almacena objetos y evidencias.
-
-Redis se usa según el diseño arquitectónico y operativo documentado.
-
-## Restricciones que no se deben ignorar
+## Restricciones
 
 - multi-tenancy;
-- PCI-DSS y tokenización de pagos;
+- tokenización y PCI-DSS;
+- 7 VMs;
 - infraestructura propia;
-- 7 VMs fijas;
-- operación académica/no 24x7;
-- despliegue reproducible;
-- Bogotá D.C. como alcance geográfico del MVP;
+- Bogotá como alcance MVP;
+- contratos explícitos;
 - tiempo académico limitado.
-
-## Precedencia documental
-
-1. `docs/requirements/SRS.md`
-2. `docs/architecture/SAD.md`
-3. `docs/architecture/SDD.md`
-4. `docs/design/DD.md`
-5. `docs/infrastructure/INFRASTRUCTURE.md`
-6. `docs/governance/WORKING_AGREEMENTS.md`
-
-Este resumen sirve para localizar información.
-
-No debe utilizarse como justificación para inventar endpoints, tablas, eventos o decisiones arquitectónicas.

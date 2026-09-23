@@ -111,6 +111,8 @@ El Gateway no contiene reglas propias de matching, solicitudes, pagos, ranking n
 
 ### 3.2.2 Identity Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** identidad, autenticación, usuarios y tenancy.
 
 **Módulos lógicos:**
@@ -132,6 +134,8 @@ El Gateway no contiene reglas propias de matching, solicitudes, pagos, ranking n
 
 ### 3.2.3 Actors Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** actores de negocio distintos de la identidad técnica.
 
 **Módulos lógicos:**
@@ -150,6 +154,8 @@ La persistencia detallada de estos conceptos se incorpora al DD cuando el Sprint
 
 ### 3.2.4 Catalog Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** catálogo de servicios y especialidades.
 
 **Responsabilidades:**
@@ -163,6 +169,8 @@ La persistencia detallada de estos conceptos se incorpora al DD cuando el Sprint
 | `ServiceCategory` | `service_categories` | Categoría o tipo de servicio solicitado. |
 
 ### 3.2.5 ServiceRequest Service
+
+**Tecnología asignada:** ASP.NET Core / .NET.
 
 **Dominio:** ciclo de vida de la solicitud de servicio.
 
@@ -236,6 +244,8 @@ El siguiente diagrama representa el flujo lógico principal del proceso de match
 
 ### 3.2.7 Ranking Service
 
+**Tecnología asignada:** ASP.NET Core / .NET.
+
 **Dominio:** reputación y evaluación agregada.
 
 **Responsabilidades:**
@@ -247,6 +257,8 @@ El siguiente diagrama representa el flujo lógico principal del proceso de match
 Los modelos persistentes definitivos de ranking permanecen sujetos a evolución del DD.
 
 ### 3.2.8 Payments Service
+
+**Tecnología asignada:** ASP.NET Core / .NET.
 
 **Dominio:** pagos y facturación.
 
@@ -267,6 +279,8 @@ Los modelos persistentes definitivos de ranking permanecen sujetos a evolución 
 **Eventos:** `payment.approved`, `payment.rejected`.
 
 ### 3.2.9 Communication Service
+
+**Tecnología asignada:** ASP.NET Core / .NET.
 
 **Dominio:** notificaciones y comunicación desacoplada.
 
@@ -353,6 +367,21 @@ payment.rejected
   "data": {}
 }
 ```
+
+---
+
+## 3.5 Decisión tecnológica vigente
+
+La asignación tecnológica de los canales y microservicios se formaliza en `ADR-012 — Stack tecnológico políglota`:
+
+- panel administrativo: Angular + TypeScript;
+- aplicación móvil para clientes y técnicos: Flutter + Dart;
+- Identity, Actors, Catalog, ServiceRequest, Ranking, Payments y Communication: ASP.NET Core / .NET;
+- Matching: Java + Spring Boot;
+- integración síncrona: REST/HTTPS;
+- integración asíncrona: Apache Kafka.
+
+La interoperabilidad entre stacks se mantiene mediante contratos REST/OpenAPI y contratos versionados de eventos Kafka. Ningún consumidor depende de clases internas de otro servicio.
 
 ---
 
@@ -447,7 +476,7 @@ La arquitectura de QUICKPATCH distribuye sus procesos a lo largo de las 7 máqui
 | Proceso / Servicio | Entorno de Ejecución | VM / Host | Rol operativo |
 |---|---|---|---|
 | **App Móvil (Flutter)** | Dispositivos móviles (Android / iOS) | Cliente externo | Interfaz de clientes y técnicos en campo (FA1: requiere conexión activa). |
-| **Panel Web (Next.js)** | Node.js runtime en Docker Compose | VM2 (`10.43.98.15`) | Interfaz administrativa del tenant y operaciones (FA2). |
+| **Panel Web Administrativo (Angular)** | build estático Angular servido por Nginx en Docker Compose | VM2 (`10.43.98.15`) | Interfaz administrativa del tenant y operaciones (FA2). |
 | **API Gateway / Reverse Proxy** | Nginx | VM1 (`10.43.100.168`) | Punto único de entrada, enrutamiento, terminación TLS e inspección JWT. |
 | **Microservicios Backend (8)** | Pods independientes en clúster k3s | VM3 (`10.43.98.205`) | Ejecución de la lógica de negocio (Identity, Actors, Catalog, Matching, ServiceRequest, Ranking, Payments, Communication). |
 | **Motor de Base de Datos** | PostgreSQL 15 + PostGIS | VM4 (`10.43.98.209`) | Almacenamiento relacional transaccional y consultas geoespaciales. |
@@ -749,7 +778,7 @@ Esta sección establece los umbrales de sincronización y rendimiento operativo 
 - proyectos/capas del backend .NET;
 - paquetes del Matching Service en Java/Spring Boot;
 - organización Flutter;
-- organización Next.js;
+- organización Angular;
 - librerías compartidas permitidas;
 - contratos y DTOs;
 - ubicación de pruebas;
@@ -786,7 +815,7 @@ flowchart TB
             VM1["Gateway<br/>Nginx + API Gateway"]
         end
         subgraph VM2N["VM2 · 10.43.98.15"]
-            VM2["Frontend Web<br/>Next.js — panel admin"]
+            VM2["Frontend Web<br/>Angular — panel admin"]
         end
         subgraph VM3N["VM3 · 10.43.98.205"]
             VM3["Backend — k3s, nodo único<br/>8 microservicios:<br/>Identity · Actors · Catalog<br/>Matching · ServiceRequest<br/>Ranking · Payments · Communication"]
@@ -884,7 +913,7 @@ flowchart TB
 
     subgraph RED["Red privada — 10.43.x.x"]
         direction LR
-        VM2N["VM2<br/>Next.js"]
+        VM2N["VM2<br/>Angular"]
         VM3N["VM3<br/>k3s"]
         VM4N["VM4<br/>PostgreSQL"]
         VM5N["VM5<br/>Redis"]
@@ -980,7 +1009,7 @@ Para cada escenario se documenta: actor, precondiciones, flujo principal, flujos
 | **Eventos / Endpoints** | `POST /v1/auth/register/client`, `POST /v1/auth/login`, `POST /v1/service-requests` · produce `service-request.created`. |
 | **Relación con Vista Lógica** | Identity Service + Catalog Service + ServiceRequest Service (Sección 3.2). |
 | **Relación con Vista de Procesos** | **Resuelto:** Ver **Sección 5.2** (flujos síncronos frente al cliente) y **Sección 5.3** (ingesta síncrona y publicación asíncrona por Outbox). |
-| **Relación con Vista de Desarrollo** | *Pendiente Backend+Frontend* — formulario de registro/solicitud (Next.js / Flutter) contra los contratos REST anteriores. |
+| **Relación con Vista de Desarrollo** | *Pendiente Backend+Frontend* — formulario de registro/solicitud (Angular / Flutter) contra los contratos REST anteriores. |
 | **Relación con Vista Física** | *Pendiente DevOps* — ruta API Gateway → Identity/Catalog/ServiceRequest dentro del clúster k3s. |
 | **Requisitos (SRS)** | RF-01, RF-03, RF-04, RF-06, RF-07, RF-08 |
 
