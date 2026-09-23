@@ -677,9 +677,36 @@ Para evitar efectos secundarios duplicados (ej. doble cobro o doble notificació
 2. El consumidor registra los `eventId` procesados en almacenamiento local o verifica si el estado actual de la entidad ya superó la transición del evento.
 3. Si el `eventId` ya fue aplicado, el consumidor descarta el procesamiento repetido y confirma el offset inmediatamente.
 
-![Diagrama de Secuencia: Indisponibilidad de Kafka y Outbox](assets/sdd/08_resiliencia_outbox.png)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Microservicio (Ej. ServiceRequest)
+    participant DB as PostgreSQL
+    participant OW as Outbox Worker (Fondo)
+    participant K as Kafka Broker
 
-*Figura 6. Tolerancia a fallos con Transactional Outbox ante indisponibilidad del broker.*
+    S->>DB: BEGIN Transaction
+    S->>DB: 1. Guarda entidad de negocio
+    S->>DB: 2. INSERT en outbox_events (published_at = null)
+    DB-->>S: COMMIT Transaction (Éxito garantizado localmente)
+    S-->>Cliente: Respuesta HTTP 2xx (No bloquea por Kafka)
+    
+    loop Cada X segundos
+        OW->>DB: SELECT * FROM outbox_events WHERE published_at IS NULL
+        DB-->>OW: Retorna evento pendiente
+        
+        OW->>K: Intenta publicar evento
+        alt Broker Caído o Red Fallando
+            K--xOW: Timeout / Connection Refused
+            OW->>OW: Espera Backoff Exponencial + Jitter
+        else Broker Disponible
+            K-->>OW: ACK (Publicación Exitosa)
+            OW->>DB: UPDATE outbox_events SET published_at = NOW()
+        end
+    end
+```
+
+**Figura 6. Tolerancia a fallos con Transactional Outbox ante indisponibilidad del broker.**
 
 ---
 
@@ -952,7 +979,7 @@ Para cada escenario se documenta: actor, precondiciones, flujo principal, flujos
 | **Datos involucrados** | `users`, `tenants`, `service_categories`, `service_requests`. |
 | **Eventos / Endpoints** | `POST /v1/auth/register/client`, `POST /v1/auth/login`, `POST /v1/service-requests` · produce `service-request.created`. |
 | **Relación con Vista Lógica** | Identity Service + Catalog Service + ServiceRequest Service (Sección 3.2). |
-| **Relación con Vista de Procesos** | *Pendiente Backend+QA* — validar si el registro y la creación de solicitud son síncronos de extremo a extremo o si la publicación del evento introduce un punto asíncrono. |
+| **Relación con Vista de Procesos** | **Resuelto:** Ver **Sección 5.2** (flujos síncronos frente al cliente) y **Sección 5.3** (ingesta síncrona y publicación asíncrona por Outbox). |
 | **Relación con Vista de Desarrollo** | *Pendiente Backend+Frontend* — formulario de registro/solicitud (Next.js / Flutter) contra los contratos REST anteriores. |
 | **Relación con Vista Física** | *Pendiente DevOps* — ruta API Gateway → Identity/Catalog/ServiceRequest dentro del clúster k3s. |
 | **Requisitos (SRS)** | RF-01, RF-03, RF-04, RF-06, RF-07, RF-08 |
@@ -969,7 +996,7 @@ Para cada escenario se documenta: actor, precondiciones, flujo principal, flujos
 | **Datos involucrados** | `technician_availability`, `coverage_zones`, `matching_attempts`, `service_requests`. |
 | **Eventos / Endpoints** | Consume `service-request.created` · produce `matching.technician-assigned`. |
 | **Relación con Vista Lógica** | Matching Service (Sección 3.2.6), Figura 3 (flujo lógico del matching). |
-| **Relación con Vista de Procesos** | *Pendiente Backend+QA* — concurrencia entre múltiples `MatchingAttempt` simultáneos, consumer group del Matching Service. |
+| **Relación con Vista de Procesos** | **Resuelto:** Ver **Sección 5.6** (Consumer Groups asignados) y **Sección 5.7** (Concurrencia y bloqueo temporal `expires_at`). |
 | **Relación con Vista de Desarrollo** | *Pendiente* — módulo Java/Spring Boot del Matching Service. |
 | **Relación con Vista Física** | *Pendiente DevOps* — nodo/contenedor del Matching Service y latencia hacia PostgreSQL+PostGIS. |
 | **Requisitos (SRS)** | RF-09, RF-10 · RNF-05 (asignación en menos de 60s) |
@@ -1001,7 +1028,7 @@ Para cada escenario se documenta: actor, precondiciones, flujo principal, flujos
 | **Datos involucrados** | `service_requests`. |
 | **Eventos / Endpoints** | `POST /v1/service-requests/{id}/start`, `POST /v1/service-requests/{id}/complete` · produce `service-request.completed`. |
 | **Relación con Vista Lógica** | ServiceRequest Service — módulo *Service Lifecycle* y *State Validation* (Sección 3.2.5). |
-| **Relación con Vista de Procesos** | *Pendiente* — propagación del cambio de estado hacia el cliente (¿polling, WebSocket, push?). |
+| **Relación con Vista de Procesos** | **Resuelto:** Ver **Sección 5.3** (Notificación push asíncrona) y **Sección 5.11.1** (SLA de actualización de estado < 60s). |
 | **Requisitos (SRS)** | RF-11, RF-13, RF-14, RF-15 · RNF-06 (reflejo de estado en menos de 1 minuto) |
 
 ### Escenario 5 — El cliente realiza el pago
@@ -1031,7 +1058,7 @@ Para cada escenario se documenta: actor, precondiciones, flujo principal, flujos
 | **Datos involucrados** | `payments`, `invoices`. |
 | **Eventos / Endpoints** | Produce `payment.approved` / `payment.rejected` · `GET /v1/payments/{id}/invoice`. |
 | **Relación con Vista Lógica** | Payments Service — módulo *Billing / Invoice Management*. |
-| **Relación con Vista de Procesos** | *Pendiente* — este es el escenario más sensible a fallas de Kafka; ver también Escenario 9. |
+| **Relación con Vista de Procesos** | **Resuelto:** Ver **Sección 5.4** (Separación entre interacción PCI-DSS de Wompi y el procesamiento asíncrono) y **Sección 5.9** (Idempotencia). |
 | **Requisitos (SRS)** | RF-24 |
 
 ### Escenario 7 — El cliente califica el servicio
@@ -1071,7 +1098,7 @@ Para cada escenario se documenta: actor, precondiciones, flujo principal, flujos
 | **Flujos alternos** | Reintentos agotados → DLQ (a definir en Vista de Procesos). |
 | **Servicios participantes** | Cualquier servicio productor, Kafka. |
 | **Relación con Vista Lógica** | Regla transversal *Idempotencia* y *Transactional Outbox* (Sección 4.2). |
-| **Relación con Vista de Procesos** | *Pendiente Backend+QA* — política de backoff, número de reintentos, definición de DLQ. |
+| **Relación con Vista de Procesos** | **Resuelto:** Ver **Sección 5.8** (Reintentos, backoff exponencial con jitter y desvío a DLQ) y **Sección 5.10** (Tolerancia a fallos). |
 | **Requisitos (SRS)** | RNF-07, RNF-08 (disponibilidad; un fallo no debe bloquear el flujo de negocio de forma permanente) |
 
 ---
@@ -1199,7 +1226,7 @@ Antes de consolidar una versión final del SDD se debe verificar:
 | Sección | Corresponde a | Estado |
 |---|---|---|
 | Vista Lógica | Backend | **Desarrollada - lista para revisión** |
-| Vista de Procesos | Backend + QA | Pendiente |
+| Vista de Procesos | Backend + QA | **Desarrollada - lista para revisión** |
 | Vista de Desarrollo | Backend + Frontend / Miguel | Pendiente |
 | Vista Física | DevOps / Sebastian | **Desarrollada - lista para revisión** |
 | Vista de Escenarios (+1) | Angy + equipo | Pendiente |
