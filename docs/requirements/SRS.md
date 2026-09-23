@@ -1,11 +1,11 @@
 # Especificación de Requisitos de Software (SRS)
-## CODEBRIDGE — Ciudad de Bogotá D.C.
+## QUICKPATCH — Ciudad de Bogotá D.C.
 
 | | |
 |---|---|
 | **Curso** | Arquitectura de Software |
 | **Proyecto Jira** | SCRUM — Arquitectura de Software |
-| **Versión del documento** | 3.0 (MVP) |
+| **Versión del documento** | 3.2 (MVP) |
 | **Estándar de referencia** | IEEE Std 830-1998 |
 
 ---
@@ -96,7 +96,7 @@ A alto nivel, el MVP debe permitir:
 
 ## 3. Usuarios del Sistema
 
-La plataforma CODEBRIDGE está diseñada para cinco tipos de usuario, cada uno con necesidades, nivel de acceso y objetivos distintos dentro del ciclo de negocio (*Cliente solicita → Técnico ejecuta → Cliente paga → Cliente califica*).
+La plataforma QUICKPATCH está diseñada para cinco tipos de usuario, cada uno con necesidades, nivel de acceso y objetivos distintos dentro del ciclo de negocio (*Cliente solicita → Técnico ejecuta → Cliente paga → Cliente califica*).
 
 | Rol | Descripción | Necesidades | Nivel de acceso |
 |---|---|---|---|
@@ -171,7 +171,7 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 
 | Feature (Jira label) | Descripción | Requisitos | HU (Jira) |
 |---|---|---|---|
-| F2.1 — Solicitud de Servicio | Creación de solicitudes de servicio técnico por Cliente y Empresa. | RF-07, RF-08 | SCRUM-27, 28 |
+| F2.1 — Solicitud de Servicio | Creación de solicitudes de servicio técnico por Cliente y Empresa, respuesta a la cotización y cancelación antes de iniciar el servicio. | RF-07, RF-08, RF-35, RF-36 | SCRUM-27, 28 (RF-35 y RF-36: historias por crear) |
 | F2.2 — Motor de Matching | Asignación automática de técnico y aceptación/rechazo de la solicitud. | RF-09, RF-10 | SCRUM-29, 30 |
 | F2.3 — Seguimiento del Servicio | Visualización en tiempo real del estado de la solicitud. | RF-11 | SCRUM-31 |
 | F2.4 — Calificación del Servicio | Calificación del servicio por parte del Cliente al finalizar. | RF-12 | SCRUM-32 |
@@ -181,7 +181,7 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 | Feature (Jira label) | Descripción | Requisitos | HU (Jira) |
 |---|---|---|---|
 | F3.1 — Perfil y Disponibilidad | Configuración de disponibilidad y zona de cobertura del Técnico. | RF-13 | SCRUM-33 |
-| F3.2 — Gestión de Servicios Asignados | Consulta de detalle y cierre (completado) de una solicitud asignada. | RF-14, RF-15 | SCRUM-34, 35 |
+| F3.2 — Gestión de Servicios Asignados | Consulta de detalle, cotización y cierre (completado, con evidencia fotográfica obligatoria) de una solicitud asignada. | RF-14, RF-15, RF-34 | SCRUM-34, 35 (RF-34: historia por crear) |
 | F3.3 — Gestión de Equipo (Proveedor) | Administración del equipo de técnicos por parte de un Proveedor. | RF-16 | SCRUM-36 |
 | F3.4 — Historial de Servicios | Consulta del historial de solicitudes atendidas por el Técnico. | RF-17 | SCRUM-37 |
 
@@ -216,7 +216,7 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 |---|---|---|---|
 | F7.1 — Gestión Documental | Creación, revisión y versionado de documentos clave del proyecto (SRS, SAD, DD, Infraestructura, Herramientas) y seguimiento de entregas. | RNF-13 | SCRUM-121 a SCRUM-133 |
 
-**Detalle de las 13 tareas de F7.1 (estado real en Jira al momento de escribir este documento):**
+**Detalle de las 13 tareas de F7.1 (estado en Jira, consultado el 23 de septiembre de 2026):**
 
 | Jira | Tarea | Responsable | Estado |
 |---|---|---|---|
@@ -226,13 +226,13 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 | SCRUM-124 | Presentación de los documentos pedidos por el profe | kathe | ✅ Finalizado |
 | SCRUM-125 | SAD V1 | Sebastian Sánchez Olaya | ✅ Finalizado |
 | SCRUM-126 | Mockups - Versión 1 | Angy Bautista | ✅ Finalizado |
-| SCRUM-127 | Presentación de la Entrega Sprint 3 | Jorge Fortich | ⬜ Por hacer |
-| SCRUM-128 | Documentos de herramientas, políticas y lineamientos V3 | Sebastian Sánchez Olaya | 🟡 En Análisis |
-| SCRUM-129 | Documento de requerimientos SRS V3 | Angy Bautista | 🟡 En desarrollo |
-| SCRUM-130 | Documento SAD V2 | Sebastian Sánchez Olaya | 🟡 En desarrollo |
-| SCRUM-131 | Documento DD V2 | joseval2910 (Jose Eduardo) | 🟡 En Análisis |
-| SCRUM-132 | Documento de Infraestructura V1 | Sebastian Sánchez Olaya | 🟡 Code Review |
-| SCRUM-133 | Documento de diseño SDD V1 | Jorge Fortich | 🟡 En desarrollo |
+| SCRUM-127 | Presentación de la Entrega Sprint 2 | Jorge Fortich | ✅ Finalizado |
+| SCRUM-128 | Documentos de herramientas, políticas y lineamientos V3 | Sebastian Sánchez Olaya | ✅ Finalizado |
+| SCRUM-129 | Documento de requerimientos SRS V3 | Angy Bautista | ✅ Finalizado |
+| SCRUM-130 | Documento SAD V2 | Sebastian Sánchez Olaya | ✅ Finalizado |
+| SCRUM-131 | Documento DD V2 | joseval2910 (Jose Eduardo) | ✅ Finalizado |
+| SCRUM-132 | Documento de Infraestructura V1 | Sebastian Sánchez Olaya | ✅ Finalizado |
+| SCRUM-133 | Documento de diseño SDD V1 | Jorge Fortich | ✅ Finalizado |
 
 ### 5.2 Requisitos Funcionales
 
@@ -257,6 +257,8 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 | RF-10 | El sistema debe permitir al Técnico aceptar o rechazar una solicitud asignada, reasignando automáticamente en caso de rechazo o falta de respuesta. | Alta | F2.2 | SCRUM-30 |
 | RF-11 | El sistema debe mostrar al Cliente el estado actual de su solicitud en tiempo real (mínimo 4 estados). | Alta | F2.3 | SCRUM-31 |
 | RF-12 | El sistema debe permitir al Cliente calificar el servicio (1 a 5) una vez la solicitud esté en estado "Completado". | Media | F2.4 | SCRUM-32 |
+| RF-35 | El sistema debe permitir al Cliente aceptar o rechazar la cotización de su solicitud. Una solicitud admite como máximo 3 cotizaciones, y una cotización sin respuesta antes de su vencimiento cancela la solicitud. | Alta | F2.1 | Por crear |
+| RF-36 | El sistema debe permitir al Cliente, o al administrador de su tenant, cancelar una solicitud mientras el servicio no haya iniciado, registrando el motivo de la cancelación. | Media | F2.1 | Por crear |
 
 #### Épica 3 — Herramientas para el Técnico y Proveedores (SCRUM-9)
 
@@ -264,9 +266,10 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 |---|---|---|---|---|
 | RF-13 | El sistema debe permitir al Técnico configurar su disponibilidad y zona de cobertura. | Alta | F3.1 | SCRUM-33 |
 | RF-14 | El sistema debe mostrar al Técnico el detalle completo de una solicitud asignada. | Alta | F3.2 | SCRUM-34 |
-| RF-15 | El sistema debe permitir al Técnico marcar una solicitud como completada, habilitando el proceso de pago. | Alta | F3.2 | SCRUM-35 |
+| RF-15 | El sistema debe permitir al Técnico marcar una solicitud como completada únicamente después de adjuntar al menos una evidencia fotográfica del trabajo realizado, habilitando el proceso de pago. | Alta | F3.2 | SCRUM-35 |
 | RF-16 | El sistema debe permitir al Proveedor registrar y administrar su equipo de técnicos. | Media | F3.3 | SCRUM-36 |
 | RF-17 | El sistema debe mostrar al Técnico el historial de solicitudes atendidas. | Media | F3.4 | SCRUM-37 |
+| RF-34 | El sistema debe permitir al Técnico asignado emitir una cotización de mano de obra y materiales para la solicitud; el servicio no puede iniciar sin una cotización aceptada por el Cliente. | Alta | F3.2 | Por crear |
 
 #### Épica 4 — Panel Administrativo y Operaciones (SCRUM-10)
 
@@ -308,8 +311,8 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 - **RNF-06** Los cambios de estado de una solicitud deben reflejarse en la interfaz del Cliente en menos de 1 minuto.
 
 **Disponibilidad y Confiabilidad**
-- **RNF-07** El sistema debe contar con un ambiente de *staging* separado del ambiente de producción.
-- **RNF-08** Un fallo en las pruebas automatizadas del flujo crítico debe bloquear el despliegue a producción.
+- **RNF-07** El sistema debe contar con un ambiente de *staging* separado de producción para las pruebas funcionales, de aceptación y de seguridad (E2E, UAT, OWASP ZAP). Las pruebas de carga y rendimiento (k6) se ejecutan sobre la infraestructura de producción, contra un tenant de prueba dedicado y en una ventana de mantenimiento programada sin usuarios activos, porque el proyecto no cuenta con una VM adicional para staging de carga (K10 del SAD, hardware fijo de 7 VMs).
+- **RNF-08** Un fallo en las pruebas automatizadas funcionales, de aceptación o de seguridad del flujo crítico, ejecutadas antes del despliegue (ver RNF-07), debe bloquear el despliegue a producción. La prueba de carga (k6) se ejecuta inmediatamente después del despliegue, dentro de la misma ventana de mantenimiento: si no cumple el umbral definido, el despliegue se revierte (`kubectl rollout undo`) antes de habilitar tráfico real, porque no existe una segunda instancia de producción donde probar la carga antes de desplegar (K10).
 
 **Escalabilidad y Arquitectura Multi-tenant**
 - **RNF-09** La arquitectura debe permitir incorporar nuevos tenants (nuevas empresas o zonas geográficas) sin afectar el aislamiento de datos de los tenants existentes.
@@ -332,9 +335,9 @@ A continuación se listan las **23 Features** identificadas en el backlog, agrup
 
 ## 6. Matriz Comparativa
 
-Con el fin de justificar el enfoque del producto, se comparó CODEBRIDGE frente a plataformas de servicios para el hogar con presencia en Colombia y/o reconocidas internacionalmente: **Timbrit** y **Chepe & Pepe** (ambas colombianas, con presencia en Bogotá), **Hogaru** (servicio recurrente de aseo, Colombia) y **TaskRabbit** (referente internacional). La información de los competidores se basa en fuentes públicas (ver Referencias) y puede no reflejar funcionalidades internas no documentadas públicamente; donde no fue posible confirmar un dato, se marca como "No especificado".
+Con el fin de justificar el enfoque del producto, se comparó QUICKPATCH frente a plataformas de servicios para el hogar con presencia en Colombia y/o reconocidas internacionalmente: **Timbrit** y **Chepe & Pepe** (ambas colombianas, con presencia en Bogotá), **Hogaru** (servicio recurrente de aseo, Colombia) y **TaskRabbit** (referente internacional). La información de los competidores se basa en fuentes públicas (ver Referencias) y puede no reflejar funcionalidades internas no documentadas públicamente; donde no fue posible confirmar un dato, se marca como "No especificado".
 
-| Criterio | CodeBridge | Timbrit | Chepe & Pepe | Hogaru | TaskRabbit |
+| Criterio | QUICKPATCH | Timbrit | Chepe & Pepe | Hogaru | TaskRabbit |
 |---|---|---|---|---|---|
 | Cobertura en Bogotá | Sí | Sí | Sí | Sí | No (sin presencia confirmada en Colombia) |
 | Cuentas corporativas multi-tenant (B2B) | **Sí** | No especificado | No especificado | No (enfoque residencial) | No especificado |
@@ -345,7 +348,7 @@ Con el fin de justificar el enfoque del producto, se comparó CODEBRIDGE frente 
 | Modelo de servicio | Bajo demanda puntual | Bajo demanda puntual | Bajo demanda puntual | Suscripción recurrente | Bajo demanda puntual |
 | Aislamiento de datos por cliente/empresa (multi-tenant) | **Sí** | No especificado | No especificado | No especificado | No especificado |
 
-**Conclusión de la comparación:** el diferenciador central de CODEBRIDGE frente a las alternativas identificadas es la combinación de **arquitectura multi-tenant orientada a cuentas corporativas (B2B)** junto con un **motor de matching automático en tiempo real**, dos capacidades que no están confirmadas públicamente en los competidores analizados, los cuales se orientan principalmente al consumidor residencial individual.
+**Conclusión de la comparación:** el diferenciador central de QUICKPATCH frente a las alternativas identificadas es la combinación de **arquitectura multi-tenant orientada a cuentas corporativas (B2B)** junto con un **motor de matching automático en tiempo real**, dos capacidades que no están confirmadas públicamente en los competidores analizados, los cuales se orientan principalmente al consumidor residencial individual.
 
 ---
 
@@ -356,8 +359,8 @@ Con el fin de justificar el enfoque del producto, se comparó CODEBRIDGE frente 
 | Épica (Jira) | Features | Requisitos | Historias de Usuario (Jira) |
 |---|---|---|---|
 | SCRUM-7 — Fundación y Multi-tenant | F1.1 – F1.4 | RF-01 – RF-06 | SCRUM-21 a SCRUM-26 |
-| SCRUM-8 — Matching y Experiencia Cliente | F2.1 – F2.4 | RF-07 – RF-12 | SCRUM-27 a SCRUM-32 |
-| SCRUM-9 — Herramientas Técnico/Proveedor | F3.1 – F3.4 | RF-13 – RF-17 | SCRUM-33 a SCRUM-37 |
+| SCRUM-8 — Matching y Experiencia Cliente | F2.1 – F2.4 | RF-07 – RF-12, RF-35, RF-36 | SCRUM-27 a SCRUM-32 |
+| SCRUM-9 — Herramientas Técnico/Proveedor | F3.1 – F3.4 | RF-13 – RF-17, RF-34 | SCRUM-33 a SCRUM-37 |
 | SCRUM-10 — Panel Administrativo | F4.1 – F4.3 | RF-18 – RF-21 | SCRUM-38 a SCRUM-41 |
 | SCRUM-11 — Pagos PCI-DSS y Facturación | F5.1 – F5.3 | RF-22 – RF-25 | SCRUM-42 a SCRUM-45 |
 | SCRUM-12 — Infraestructura y QA | F6.1 – F6.4 | RF-26 – RF-29 | SCRUM-46 a SCRUM-49 |
@@ -365,9 +368,9 @@ Con el fin de justificar el enfoque del producto, se comparó CODEBRIDGE frente 
 
 ### 7.2 Resumen de Requisitos Funcionales
 
-El presente MVP contempla un total de **29 requisitos funcionales**, agrupados en **23 Features**, organizados en **7 módulos de dominio** y soportados por **7 módulos transversales** (incluyendo la nueva épica de Control de Cambios), distribuidos en **7 épicas**. Todos los requisitos están priorizados como *Alta* o *Media* por ser esenciales para demostrar el ciclo completo del negocio: registro y autenticación multi-tenant, solicitud de servicio, asignación automática, ejecución técnica, pago seguro y calificación. Adicionalmente, se incluye un requisito no funcional (RNF-13) para la gestión documental y control de cambios del proyecto.
+El presente MVP contempla un total de **32 requisitos funcionales**, agrupados en **23 Features**, organizados en **7 módulos de dominio** y soportados por **7 módulos transversales** (incluyendo la nueva épica de Control de Cambios), distribuidos en **7 épicas**. Todos los requisitos están priorizados como *Alta* o *Media* por ser esenciales para demostrar el ciclo completo del negocio: registro y autenticación multi-tenant, solicitud de servicio, asignación automática, cotización, ejecución técnica con evidencia fotográfica, pago seguro y calificación. La numeración salta de RF-29 a RF-34 porque RF-30 a RF-33 (versiones 2.x, control de cambios) se retiraron en la versión 3.0 al reemplazarse por RNF-13, y sus números no se reutilizan. Adicionalmente, se incluye un requisito no funcional (RNF-13) para la gestión documental y control de cambios del proyecto.
 
-**Estado de avance de la Épica 7 (a la fecha):** de las 13 tareas, **6 están Finalizadas** (SCRUM-121 a 126), **1 está Por hacer** (SCRUM-127) y **6 están en curso** — En Análisis, En desarrollo o Code Review (SCRUM-128 a 133). Esto refleja que el equipo ya cerró las entregas de la iteración anterior y se encuentra trabajando activamente en las versiones V2/V3 de los documentos (SRS, SAD, DD, Herramientas, Infraestructura, SDD).
+**Estado de avance de la Épica 7 (consultado en Jira el 23 de septiembre de 2026):** las 13 tareas (SCRUM-121 a SCRUM-133) figuran como Finalizadas, incluidas las versiones V2 y V3 de los documentos (SRS, SAD, DD, Herramientas, Infraestructura y SDD) y la presentación de la entrega del Sprint 2.
 
 ### 7.3 Control de Versiones del Documento
 
@@ -377,7 +380,8 @@ El presente MVP contempla un total de **29 requisitos funcionales**, agrupados e
 | 2.0 | 31 ago 2026 | Se incorpora el nombre del producto (QUICKPATCH); se agrega la sección de Features del sistema y su trazabilidad a requisitos e historias de usuario. |
 | 2.0 | (edición posterior) | Se elimina el alcance del proyecto ya que no corresponde a este documento. Se agrega el Capítulo de Usuarios del Sistema (independiente); se agrega el Capítulo de Módulos del Producto (dominio y transversales); se agrega la Matriz Comparativa frente a plataformas similares; se reincorpora la sección de Referencias. |
 | 3.0 | (edición posterior) | Se añade la Épica 7 (Control de cambios - equipo) con su Feature F7.1 y el requisito no funcional RNF-13. Se actualiza la matriz de trazabilidad y el resumen de requisitos para incluir la nueva épica y sus historias de usuario asociadas. Se renombra el producto de QUICKPATCH a **CODEBRIDGE**. |
-| 3.1 | *(este documento)* | Conversión a Markdown. Se corrige la tabla de la Feature F7.1: se agregan SCRUM-126 y SCRUM-127, que estaban omitidos, completando el rango real de 13 tareas (SCRUM-121 a SCRUM-133) verificado directamente en Jira. Se agrega el detalle de estado y responsable de cada tarea de la Épica 7. |
+| 3.1 | 14 sep 2026 | Conversión a Markdown. Se corrige la tabla de la Feature F7.1: se agregan SCRUM-126 y SCRUM-127, que estaban omitidos, completando el rango real de 13 tareas (SCRUM-121 a SCRUM-133) verificado directamente en Jira. Se agrega el detalle de estado y responsable de cada tarea de la Épica 7. |
+| 3.2 | *(este documento)* | Se alinea con el SAD v2.11 y el DD v2.2 (dependencia DEP-10 del DD). RF-15 vuelve a exigir al menos una evidencia fotográfica antes de completar el servicio (driver D7 del SAD). Se agregan RF-34 (cotización del técnico), RF-35 (respuesta del cliente a la cotización) y RF-36 (cancelación antes de iniciar el servicio), que el SAD define en el ciclo de vida del servicio (sección 7.4); sus historias en Jira están por crear. RNF-07 y RNF-08 recuperan la redefinición del modelo de staging acordada en las versiones 2.3 y 2.4, alineada con el Documento de Infraestructura. El producto vuelve a llamarse QUICKPATCH en todo el documento: CODEBRIDGE es el nombre del curso, no del producto. Se actualiza el estado de la Épica 7 según Jira (SCRUM-127 corresponde a la presentación del Sprint 2). |
 
 ---
 
@@ -385,7 +389,7 @@ El presente MVP contempla un total de **29 requisitos funcionales**, agrupados e
 
 1. IEEE Std 830-1998, *IEEE Recommended Practice for Software Requirements Specifications*, Institute of Electrical and Electronics Engineers.
 2. PCI Security Standards Council, *Payment Card Industry Data Security Standard (PCI-DSS)*. Disponible en: [https://www.pcisecuritystandards.org](https://www.pcisecuritystandards.org)
-3. Backlog de producto CODEBRIDGE — Versión 1 (MVP), proyecto **SCRUM** en Jira (Atlassian), Épicas SCRUM-7 a SCRUM-12 y SCRUM-120, Historias SCRUM-21 a SCRUM-49 y SCRUM-121 a SCRUM-133.
+3. Backlog de producto QUICKPATCH — Versión 1 (MVP), proyecto **SCRUM** en Jira (Atlassian), Épicas SCRUM-7 a SCRUM-12 y SCRUM-120, Historias SCRUM-21 a SCRUM-49 y SCRUM-121 a SCRUM-133.
 4. Timbrit — Plataforma colombiana de contratación de profesionales para el hogar. Disponible en: [https://www.timbrit.com.co/](https://www.timbrit.com.co/)
 5. La República, *Conozca las aplicaciones disponibles que le ayudan con todas las tareas del hogar*, 2019. Disponible en: [https://www.larepublica.co/internet-economy/conozca-las-aplicaciones-disponibles-que-le-ayudan-con-todas-las-tareas-del-hogar-2936445](https://www.larepublica.co/internet-economy/conozca-las-aplicaciones-disponibles-que-le-ayudan-con-todas-las-tareas-del-hogar-2936445)
 6. La República, *Conozca cinco aplicaciones que le ayudan a reparar y asear su hogar*. Disponible en: [https://www.larepublica.co/infraestructura/conozca-cinco-aplicaciones-que-le-ayudan-a-reparar-y-asear-su-hogar-2897117](https://www.larepublica.co/infraestructura/conozca-cinco-aplicaciones-que-le-ayudan-a-reparar-y-asear-su-hogar-2897117)
