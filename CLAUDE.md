@@ -57,7 +57,7 @@ No resuelvas contradicciones silenciosamente.
 ### DevOps
 `.ai/roles/devops.md`
 
-Áreas principales futuras: `infra/**` y `.github/workflows/**`
+Áreas principales futuras: `infrastructure/**` y `.github/workflows/**`
 
 ## 5. Política de contexto
 
