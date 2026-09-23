@@ -1,0 +1,30 @@
+# Entorno / IDE
+.vscode/
+.idea/
+
+# Obsidian: conservar configuración compartible, ignorar estado personal
+Documentos/.obsidian/workspace.json
+Documentos/.obsidian/workspace-mobile.json
+
+# Variables y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Dependencias/builds futuros
+node_modules/
+dist/
+build/
+coverage/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies

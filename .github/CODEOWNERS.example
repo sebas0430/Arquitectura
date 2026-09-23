@@ -1,0 +1,13 @@
+# Reemplazar los placeholders por usernames/equipos reales antes de renombrar a CODEOWNERS.
+# GitHub ignora este archivo mientras se llame CODEOWNERS.example.
+
+/apps/backend/        @BACKEND_OWNER
+/apps/web/            @FRONTEND_OWNER
+/apps/mobile/         @FRONTEND_OWNER
+/tests/               @QA_OWNER
+/infra/               @DEVOPS_OWNER
+/.github/workflows/   @DEVOPS_OWNER
+
+# Contratos requieren revisión cruzada
+/docs/contracts/      @BACKEND_OWNER @FRONTEND_OWNER @QA_OWNER
+/Documentos/          @ARCHITECTURE_OWNER

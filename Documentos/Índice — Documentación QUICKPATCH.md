@@ -1,28 +1,43 @@
+# Índice — Documentación QUICKPATCH
 
+Plataforma Digital Multi-tenant de Servicios Técnicos para el Hogar y las Empresas — Arquitectura de Software.
 
-Plataforma Digital Multi-tenant de Servicios Técnicos para el Hogar y las Empresas — Arquitectura de Software
+Este archivo es el punto de entrada a la documentación formal del proyecto.
 
-Este es el punto de entrada a toda la documentación formal y operativa del proyecto. Cada entregable vive en su propia nota y se referencia desde aquí.
+## Documentos vigentes
 
----
-
-## Entregables de rúbrica
-
-|Documento|Contenido|
+| Documento | Propósito |
 |---|---|
-|[[SAD]]|Software Architecture Document — arquitectura general, escenarios de calidad, ADRs, diagramas C4.|
-|[[SRS]]|Software Requirements Specification — requisitos funcionales y no funcionales, features, trazabilidad a Jira.|
-|[[DD]]|Documento de Diseño — diccionario de datos, modelo ER, contratos REST y eventos Kafka.|
-|[[Documento Politicas y Herramientas]]|GitFlow, políticas de equipo, versionamiento, backlog, estilo de código, uso de IA, documentación técnica.|
+| `SRS.md` | Requisitos funcionales, no funcionales, interfaces y alcance. |
+| `SAD.md` | Arquitectura, drivers, killers, atributos de calidad, escenarios y ADR. |
+| `SDD.md` | Diseño por vistas y relación entre componentes, procesos y despliegue. |
+| `DDv2.md` | Documento de Diseño vigente temporal: datos y contratos. |
+| `Documento de Infraestructura.md` | Topología, ambientes, despliegue, observabilidad y operación. |
+| `Documento Politicas y Herramientas.md` | GitFlow, colaboración, herramientas, calidad y uso de IA. |
 
----
+## Documento histórico
 
-## Cómo se relacionan
+`DD.md` corresponde a la versión anterior del Documento de Diseño. Hasta completar la reorganización física del repositorio se conserva en esta carpeta, pero las nuevas decisiones deben consultar `DDv2.md`.
 
-- **[[SAD]]** define la arquitectura (módulos, ADRs) que **[[DD]]** traduce a modelo de datos y contratos concretos.
-- **[[SRS]]** define los requisitos (RF/RNF) que tanto **[[SAD]]** como **[[DD]]** deben satisfacer — el DD referencia explícitamente los códigos RF-XX de cada tabla.
-- **[[Documento Politicas y Herramientas]]** define cómo trabaja el equipo (GitFlow, commits, CI) para construir lo que describen los tres documentos anteriores.
+## Precedencia
 
----
+Cuando exista una aparente contradicción:
 
-_Última actualización: 3 de septiembre de 2026._
+1. El SRS define **qué debe hacer** el producto.
+2. El SAD define **qué arquitectura y restricciones** gobiernan la solución.
+3. El SDD define **cómo se diseña** la solución respetando SRS y SAD.
+4. El DD define **cómo se representan datos y contratos concretos**.
+5. Infraestructura define **cómo se despliega y opera**.
+6. Políticas define **cómo colabora el equipo**.
+
+Una contradicción real no se resuelve silenciosamente: debe corregirse en la fuente correspondiente y mantener trazabilidad.
+
+## Contexto para asistentes de IA
+
+Los agentes no deben cargar toda esta carpeta por defecto.
+
+Punto de entrada:
+
+- `../AGENTS.md`
+- `../CLAUDE.md`
+- `../.ai/PROJECT_CONTEXT.md`
