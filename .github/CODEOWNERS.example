@@ -1,29 +1,13 @@
 # Reemplazar los placeholders por usernames/equipos reales antes de renombrar a CODEOWNERS.
 # GitHub ignora este archivo mientras se llame CODEOWNERS.example.
 
-# Código de aplicación
 /apps/backend/        @BACKEND_OWNER
 /apps/web/            @FRONTEND_OWNER
 /apps/mobile/         @FRONTEND_OWNER
-
-# Calidad
 /tests/               @QA_OWNER
-
-# Infraestructura y automatización
 /infra/               @DEVOPS_OWNER
 /.github/workflows/   @DEVOPS_OWNER
 
-# Contexto y reglas de IA
-/.ai/                 @ARCHITECTURE_OWNER
-/AGENTS.md             @ARCHITECTURE_OWNER
-/CLAUDE.md             @ARCHITECTURE_OWNER
-
-# Documentación formal
-/docs/requirements/    @ARCHITECTURE_OWNER
-/docs/architecture/    @ARCHITECTURE_OWNER
-/docs/design/          @ARCHITECTURE_OWNER
-/docs/infrastructure/  @DEVOPS_OWNER @ARCHITECTURE_OWNER
-/docs/governance/      @ARCHITECTURE_OWNER
-
-# Contratos compartidos
-/docs/contracts/       @BACKEND_OWNER @FRONTEND_OWNER @QA_OWNER
+# Contratos requieren revisión cruzada
+/docs/contracts/      @BACKEND_OWNER @FRONTEND_OWNER @QA_OWNER
+/Documentos/          @ARCHITECTURE_OWNER
