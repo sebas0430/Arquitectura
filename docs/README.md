@@ -11,13 +11,13 @@ Este archivo es el punto de entrada a la documentación formal del proyecto.
 | `SRS.md` | Requisitos funcionales, no funcionales, interfaces y alcance. |
 | `SAD.md` | Arquitectura, drivers, killers, atributos de calidad, escenarios y ADR. |
 | `SDD.md` | Diseño por vistas y relación entre componentes, procesos y despliegue. |
-| `DDv2.md` | Documento de Diseño vigente temporal: datos y contratos. |
+| `design/DD.md` | Documento de Diseño vigente temporal: datos y contratos. |
 | `Documento de Infraestructura.md` | Topología, ambientes, despliegue, observabilidad y operación. |
 | `Documento Politicas y Herramientas.md` | GitFlow, colaboración, herramientas, calidad y uso de IA. |
 
 ## Documento histórico
 
-`DD.md` corresponde a la versión anterior del Documento de Diseño. Hasta completar la reorganización física del repositorio se conserva en esta carpeta, pero las nuevas decisiones deben consultar `DDv2.md`.
+`archive/DD-v1.md` corresponde a la versión histórica anterior del Documento de Diseño. La versión vigente y única fuente de verdad para nuevas decisiones es `design/DD.md`.
 
 ## Precedencia
 
