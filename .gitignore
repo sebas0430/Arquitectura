@@ -3,8 +3,8 @@
 .idea/
 
 # Obsidian: conservar configuración compartible, ignorar estado personal
-Documentos/.obsidian/workspace.json
-Documentos/.obsidian/workspace-mobile.json
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
 
 # Variables y secretos
 .env
