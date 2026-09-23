@@ -496,9 +496,46 @@ Este flujo describe el ciclo desde la creación de la necesidad por parte del cl
 7. **Notificación y Asignación:** `ServiceRequest Service` actualiza el estado a `asignado`. Simultáneamente, `Communication Service` consume el evento y dispara la notificación push al técnico y al cliente en menos de 7 segundos (AC2-E3).
 8. **Respuesta del Técnico:** El técnico dispone de un tiempo límite para aceptar (`POST /v1/matching/{id}/accept`) o rechazar (`POST /v1/matching/{id}/reject`). Si rechaza o el tiempo expira, el Matching Service inicia la reasignación automática hacia el siguiente candidato disponible (RF-10).
 
-![Diagrama de Secuencia: Creación de Solicitud, Matching y Asignación](assets/sdd/06_secuencia_matching.png)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Cliente
+    participant GW as API Gateway
+    participant SR as ServiceRequest Service
+    participant DB as PostgreSQL (Outbox)
+    participant K as Kafka Broker
+    participant M as Matching Service
+    participant COM as Communication Service
+    actor T as Técnico
 
-*Figura 4. Flujo asíncrono de creación de solicitud, matching con PostGIS y notificación.*
+    C->>GW: POST /v1/service-requests (Categoría, Ubicación)
+    GW->>SR: Enruta con tenant_id y user_id
+    SR->>DB: BEGIN Transaction
+    SR->>DB: Guarda solicitud (Estado: buscando_tecnico)
+    SR->>DB: Inserta evento en outbox_events
+    DB-->>SR: COMMIT Transaction
+    SR-->>C: 201 Created (ID de solicitud)
+    
+    DB->>K: Outbox Worker publica: service-request.created
+    
+    K-->>M: Consume evento
+    M->>DB: PostGIS: Busca técnico (disponible, cobertura, especialidad)
+    M->>K: Publica: matching.technician-assigned (con ID del candidato)
+    
+    par Actualización de Estado
+        K-->>SR: Consume evento
+        SR->>DB: Actualiza solicitud (Estado: asignado)
+    and Notificación
+        K-->>COM: Consume evento
+        COM-->>T: Envía Notificación Push (Nueva Asignación)
+        COM-->>C: Envía Notificación Push (Técnico Encontrado)
+    end
+    
+    T->>GW: POST /v1/matching/{id}/accept
+    GW->>M: Técnico acepta la solicitud
+```
+
+**Figura 4. Flujo asíncrono de creación de solicitud, matching con PostGIS y notificación.**
 
 ---
 
@@ -517,9 +554,51 @@ Este flujo describe el cierre operativo del servicio y el cobro bajo el estánda
 7. **Cierre de Ciclo:** `ServiceRequest Service` consume `payment.approved` y actualiza el estado a `pagado`. `Communication Service` notifica la aprobación y envía el enlace de descarga de la factura.
 8. **Calificación:** El cliente califica el servicio (`POST /v1/service-requests/{id}/rating`, 1 a 5 estrellas). Se almacena en `ratings` y se emite el evento para que `Ranking Service` actualice la reputación agregada del técnico.
 
-![Diagrama de Secuencia: Completar Servicio, Evidencia y Pago](assets/sdd/07_secuencia_pagos.png)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor T as Técnico
+    participant GW as API Gateway
+    participant S3 as MinIO (Almacenamiento)
+    participant SR as ServiceRequest Service
+    actor C as Cliente
+    participant PSP as Wompi (PSP)
+    participant P as Payments Service
+    participant K as Kafka Broker
+    participant COM as Communication Service
 
-*Figura 5. Flujo de finalización de servicio, tokenización PCI-DSS y facturación.*
+    T->>GW: POST /v1/service-requests/{id}/evidence (Foto)
+    GW->>S3: Guarda archivo fotográfico
+    S3-->>GW: URL de la evidencia
+    GW->>SR: Guarda URL en service_evidence
+    
+    T->>GW: POST /v1/service-requests/{id}/complete
+    GW->>SR: Valida que exista evidencia previa
+    SR->>SR: Cambia estado a 'completado'
+    SR->>K: Publica: service-request.completed
+    
+    C->>PSP: Ingresa tarjeta (Directo al SDK de Wompi - PCI-DSS)
+    PSP-->>C: Retorna Token Seguro (provider_token_ref)
+    
+    C->>GW: POST /v1/service-requests/{id}/payment (Token)
+    GW->>P: Solicita cobro
+    P->>PSP: Autoriza cobro con el Token
+    PSP-->>P: Pago Aprobado
+    
+    P->>P: Cambia estado a 'aprobado'
+    P->>P: Genera Factura en BD
+    P->>K: Outbox publica: payment.approved
+    
+    par Actualización de Solicitud
+        K-->>SR: Consume evento
+        SR->>SR: Cambia estado a 'pagado'
+    and Notificación al Cliente
+        K-->>COM: Consume evento
+        COM-->>C: Notifica pago exitoso y envía enlace Factura
+    end
+```
+
+**Figura 5. Flujo de finalización de servicio, tokenización PCI-DSS y facturación.**
 
 ---
 
